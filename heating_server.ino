@@ -135,7 +135,7 @@ void loop() {
           }
     }    
     if (strcmp(temp.cmd,"OFF")==0){ 
-          if (temp.ID>=0 && temp.ID<4){       
+          if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO ){       
             char tm[20];
             sprintf(tm,"C%d heating OFF",temp.ID+1);
             hdisplay->printStatusBar(tm);    

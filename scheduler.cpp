@@ -411,12 +411,12 @@ void hPumpsController::turnOffCircPumpReq()
 	tTime.tm_min = minute();
 	tTime.tm_mday = day();
 	tTime.tm_wday = weekday();
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, minutly, 14));
+	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF));
 }
 
 void hPumpsController::saintyCheck()
 {
-
+	
 	//search for pumps running longer than 24h
 }
 

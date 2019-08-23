@@ -19,7 +19,7 @@ Windows  C++ test file
 
 //global variables;
 void hookTest() {
-	std::cout << "\n hook function";
+	//std::cout << "\n hook function";
 }
 
 
@@ -42,9 +42,9 @@ int main()
 	dyro->addTask(tt);
 	dyro->addTask(new enable_internal_wifi(true, time, minutly, 0));
 	heatPumpController->createDailyPlan(false);
-
-	while (1) {
-
+	int tcount = 0;
+	while (tcount<1) {
+		tcount++;
 		for (int i = 0; i < 100; i++) {
 			heatPumpController->turnOnHeatPumpReq(random(0,3), 0, 5);
 			dyro->executeTasks();
@@ -91,8 +91,3 @@ int main()
 	delete tt;
 
 }
-
-
-
-
-

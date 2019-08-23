@@ -30,13 +30,20 @@ void hConfigurator::setPumpStatusOff(int pumpNumber)
 	if (pumpNumber >= 0 && pumpNumber <= _DOMESTIC_WATER_PUMP) {
 		_pumps[pumpNumber].running = false;
 		saveHistory(_pumps[pumpNumber]);
+		_pumps[pumpNumber].actualTemp = 0;
+		_pumps[pumpNumber].minuts = 0;
+		_pumps[pumpNumber].setTemp = 0;
+		_pumps[pumpNumber].start_day = 0;
+		_pumps[pumpNumber].start_hour = 0;
+		_pumps[pumpNumber].start_minute = 0;
+		_pumps[pumpNumber].actualMinute = 0;
 	}
 }
 
 bool hConfigurator::getPumpStatus(int pumpNumber)
 {
 	bool result = false;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < _DOMESTIC_WATER_PUMP; i++) {
 		if (_pumps[i].running && _pumps[i].pumpNumber==pumpNumber) {
 			result = true;
 		}
@@ -44,10 +51,16 @@ bool hConfigurator::getPumpStatus(int pumpNumber)
 	return result;
 }
 
+int hConfigurator::getPumpRunningMinuts(int pumpNumber)
+{
+
+	return 0;
+}
+
 bool hConfigurator::heatPumpsRunning()
 {
 	bool result = false;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < _DOMESTIC_WATER_PUMP; i++) {
 		if (_pumps[i].running) {
 			result = true;
 		}
@@ -93,15 +106,20 @@ int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
 
 void hConfigurator::tickMinutes()
 {
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i <= _DOMESTIC_WATER_PUMP; i++) {
 		if (&_pumps[i] == nullptr) continue;
+		/*
 		if (_pumps[i].running && _pumps[i].start_minute != minute() ) {
 			_pumps[i].minuts++;
 		}
 		if (_pumps[i].running && _pumps[i].start_minute == minute() && _pumps[i].start_hour != hour()) {
 			_pumps[i].minuts++;
 		}
-
+		*/
+		if (_pumps[i].running && _pumps[i].actualMinute != minute()) {
+			_pumps[i].minuts++;
+			_pumps[i].actualMinute = minute();
+		}
 	}
 }
 

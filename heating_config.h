@@ -29,6 +29,7 @@ const int _DOMESTIC_WATER_PUMP_OFF = _DOMESTIC_WATER_PUMP + 10;
 
 struct pumpStatus {
 	int minuts = 0; //worked minuts;
+	int actualMinute = 0;
 	bool running = false;
 	int start_minute = 0;
 	int start_hour = 0;
@@ -54,6 +55,7 @@ class hConfigurator{
 	void setPumpStatusOn(int pumpNumber, float actualTemp, float setTemp);
 	void setPumpStatusOff(int pumpNumber);
 	bool getPumpStatus(int pumpNumber); //return pump status true - is running false isn't running
+	int getPumpRunningMinuts(int pumpNumber);//return number of minuts running for pumpNumber;
 	bool heatPumpsRunning();
 	bool circulationPumpsRunning();
 	int lastOnOffPump(int pumpNumber, int lastMinuts); //count on-off cycles history for pumpNumber
