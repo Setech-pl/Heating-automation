@@ -16,7 +16,6 @@ public:
 	virtual bool  execute() = 0;
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,int payload );
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)() );
-	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController * controller, int payload);
 
 	bool disposable;
 	tm scheduleTime;
@@ -25,7 +24,7 @@ public:
 	char result[21]; 
 protected:
 	void (*_callbackFunction)();
-	hPumpsController *pumpsController;
+	hCommand* pumpsController;
 
 };
 
@@ -72,13 +71,6 @@ public:
 	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 };
 
-class hSanityCheckCommand : public hCommand {
-public:
-	bool execute();
-	hSanityCheckCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController *controller, int payload) : hCommand(disposable, scheduleTime, scheduleType, controller, payload) {};
-
-};
-
 class hPumpsController {
 public:
 	hPumpsController(hScheduler *scheduler, hConfigurator *config);
@@ -95,3 +87,5 @@ private:
 
 
 };
+
+

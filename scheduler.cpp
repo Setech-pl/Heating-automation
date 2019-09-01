@@ -154,7 +154,7 @@ bool hScheduler::checkSchedule(int cNumber)
 	switch (commands[cNumber]->scheduleType) {
 	case daily:
 		if (commands[cNumber]->scheduleTime.tm_wday==weekday() && commands[cNumber]->scheduleTime.tm_hour == hour() 
-			&& (commands[cNumber]->scheduleTime.tm_min = minute())) {
+			&& (commands[cNumber]->scheduleTime.tm_min == minute())) {
 			commands[cNumber]->scheduleTime.tm_wday++;
 				if (commands[cNumber]->scheduleTime.tm_wday > 6) {
 					commands[cNumber]->scheduleTime.tm_wday = 0;
@@ -179,7 +179,7 @@ bool hScheduler::checkSchedule(int cNumber)
 		}
 		break;
 	case minutly:
-		if (commands[cNumber]->scheduleTime.tm_min = minute()) {
+		if (commands[cNumber]->scheduleTime.tm_min == minute()) {
 			commands[cNumber]->scheduleTime.tm_min++;
 			if (commands[cNumber]->scheduleTime.tm_min > 59) {
 				commands[cNumber]->scheduleTime.tm_min = 0;
@@ -239,14 +239,6 @@ hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,
 	this->_callbackFunction = callbackFunction;
 }
 
-hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController * controller, int payload)
-{
-	this->disposable = disposable;
-	this->scheduleTime = scheduleTime;
-	this->scheduleType = scheduleType;
-	this->payload = payload;
-	this->pumpsController = controller;
-}
 
 
 
@@ -326,12 +318,6 @@ void hPumpsController::createDailyPlan(bool holiday)  //daily plan factory
 
 		}
 
-		//NTP Update at sunday 03:00
-		scht.tm_hour = 3;
-		scht.tm_min = 0;
-		scht.tm_wday = 0;
-		_scheduler->addTask(new ntp_update(false, scht, daily, 123));
-		_scheduler->addTask(new hSanityCheckCommand(false, scht, minutly, this,0));
 
 }
 
@@ -445,9 +431,4 @@ bool hCallbackCommand::execute()
 	return false;
 }
 
-bool hSanityCheckCommand::execute()
-{
-	
-	return false;
-}
 

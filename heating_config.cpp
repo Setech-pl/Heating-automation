@@ -53,8 +53,7 @@ bool hConfigurator::getPumpStatus(int pumpNumber)
 
 int hConfigurator::getPumpRunningMinuts(int pumpNumber)
 {
-
-	return 0;
+	return _pumps[pumpNumber].minuts;
 }
 
 bool hConfigurator::heatPumpsRunning()
@@ -108,14 +107,6 @@ void hConfigurator::tickMinutes()
 {
 	for (int i = 0; i <= _DOMESTIC_WATER_PUMP; i++) {
 		if (&_pumps[i] == nullptr) continue;
-		/*
-		if (_pumps[i].running && _pumps[i].start_minute != minute() ) {
-			_pumps[i].minuts++;
-		}
-		if (_pumps[i].running && _pumps[i].start_minute == minute() && _pumps[i].start_hour != hour()) {
-			_pumps[i].minuts++;
-		}
-		*/
 		if (_pumps[i].running && _pumps[i].actualMinute != minute()) {
 			_pumps[i].minuts++;
 			_pumps[i].actualMinute = minute();

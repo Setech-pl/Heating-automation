@@ -20,8 +20,8 @@ int weekday() {
 
 
 int hour() {
-	//return rand()%24;
-	return  23;
+	return rand()%24;
+	//return  23;
 }
 
 int minute() {
@@ -31,7 +31,7 @@ int minute() {
 
 int day()
 {
-	return 0;
+	return rand()%7;
 }
 
 

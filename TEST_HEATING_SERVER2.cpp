@@ -16,12 +16,31 @@ Windows  C++ test file
 
 #include "screen.h"
 
+//global variables
+hScheduler* dyro = new hScheduler();
+hConfigurator* config = new hConfigurator();
+hPumpsController* heatPumpController = new hPumpsController(dyro, config);
 
 //global hook functions
+
 void hookTest() {
 	//std::cout << "\n hook function";
 }
 
+void hookExecuteSanityCheck() {
+	heatPumpController->saintyCheck();
+}
+
+void createDailyPlans() {
+	heatPumpController->createDailyPlan(false);
+	tm time;
+	time.tm_hour = hour();
+	time.tm_min = minute();
+	time.tm_wday = weekday();
+	time.tm_mday = day();
+	hCallbackCommand* tt = new hCallbackCommand(false, time, minutly, &hookExecuteSanityCheck);
+	dyro->addTask(tt);
+}
 
 int main()
 
@@ -30,9 +49,7 @@ int main()
 
 	srand(time(0));
 	//Arduino global variables
-	hScheduler* dyro = new hScheduler();
-	hConfigurator* config = new hConfigurator();
-	hPumpsController* heatPumpController = new hPumpsController(dyro, config);
+
 	tm time;
 	time.tm_hour = hour();
 	time.tm_min = minute();
@@ -41,25 +58,22 @@ int main()
 	hCallbackCommand* tt = new hCallbackCommand(false, time, minutly, &hookTest);
 	dyro->addTask(tt);
 	dyro->addTask(new enable_internal_wifi(true, time, minutly, 0));
-	heatPumpController->createDailyPlan(false);
+	createDailyPlans();
 
 	while (1) {
 		
-		for (int i = 0; i < 100; i++) {
+		for (int i = 0; i < 256; i++) {
 			heatPumpController->turnOnHeatPumpReq(random(0,3), 0, 5);
 			dyro->executeTasks();
-			config->tickMinutes();
 		}
-		for (int i = 0; i < 100; i++) {
-			heatPumpController->turnOffHeatPumpReq(random(0, 3));
+		for (int i = 0; i < 256; i++) {
+		//eatPumpController->turnOffHeatPumpReq(random(0, 3));
 			dyro->executeTasks();
-			config->tickMinutes();
 		}
-
+		config->tickMinutes();
 
 		heatPumpController->turnOnCircPumpReq();
 		dyro->executeTasks();
-		config->tickMinutes();
 		heatPumpController->turnOffCircPumpReq();
 		dyro->executeTasks();
 		config->tickMinutes();

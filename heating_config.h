@@ -22,7 +22,7 @@ const bool _INTERNAL_WIFI_MODE = false;
 #define _MAX_HEATING_PUMPS_NO 4
 #define _MAX_DAY_OVERHEATING 1
 #define _MAX_NIGHT_COOLING -2
-#define _MAX_HEATING_PUMP_RUNNING_MINUTES 13
+#define _MAX_HEATING_PUMP_RUNNING_MINUTES 143
 const int _PRIORITY_ARRAY[_MAX_HEATING_PUMPS_NO] = { 2,2,1,0 }; //Priority array, 
 const int _DOMESTIC_WATER_PUMP = 4; //0,1,2,3 heating pumps, 4 water pump
 const int _DOMESTIC_WATER_PUMP_OFF = _DOMESTIC_WATER_PUMP + 10;
