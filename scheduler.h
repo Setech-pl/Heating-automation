@@ -16,6 +16,8 @@ public:
 	virtual bool  execute() = 0;
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,int payload );
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)() );
+	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController * controller, int payload);
+
 	bool disposable;
 	tm scheduleTime;
 	escheduleType scheduleType;
@@ -23,6 +25,7 @@ public:
 	char result[21]; 
 protected:
 	void (*_callbackFunction)();
+	hPumpsController *pumpsController;
 
 };
 
@@ -53,7 +56,7 @@ private:
 	int getFreeSlot();
 	bool checkSchedule(int cNumber);
 	bool findDuplicate(hCommand* polecenie);
-	void saintyCheck();
+
 
 };
 
@@ -69,8 +72,12 @@ public:
 	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 };
 
+class hSanityCheckCommand : public hCommand {
+public:
+	bool execute();
+	hSanityCheckCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController *controller, int payload) : hCommand(disposable, scheduleTime, scheduleType, controller, payload) {};
 
-
+};
 
 class hPumpsController {
 public:
@@ -78,12 +85,13 @@ public:
 	void createDailyPlan(bool holiday );
 	void removeDailyPlan(int pumpNumber); //removes plan for pump number /1-5/
 	void turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
-	void turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
+	void turnOffHeatPumpReq(int pumpNumber);
 	void turnOnCircPumpReq();
 	void turnOffCircPumpReq();
+	void saintyCheck();
 private:
 	hScheduler* _scheduler;
 	hConfigurator* _config;
-	void saintyCheck();
+
 
 };

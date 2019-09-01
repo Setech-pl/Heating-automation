@@ -17,7 +17,7 @@ Windows  C++ test file
 #include "screen.h"
 
 
-//global variables;
+//global hook functions
 void hookTest() {
 	//std::cout << "\n hook function";
 }
@@ -42,16 +42,16 @@ int main()
 	dyro->addTask(tt);
 	dyro->addTask(new enable_internal_wifi(true, time, minutly, 0));
 	heatPumpController->createDailyPlan(false);
-	int tcount = 0;
-	while (tcount<1) {
-		tcount++;
+
+	while (1) {
+		
 		for (int i = 0; i < 100; i++) {
 			heatPumpController->turnOnHeatPumpReq(random(0,3), 0, 5);
 			dyro->executeTasks();
 			config->tickMinutes();
 		}
 		for (int i = 0; i < 100; i++) {
-			heatPumpController->turnOffHeatPumpReq(random(0, 3), 12, 5);
+			heatPumpController->turnOffHeatPumpReq(random(0, 3));
 			dyro->executeTasks();
 			config->tickMinutes();
 		}

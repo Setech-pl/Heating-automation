@@ -218,9 +218,6 @@ bool hScheduler::findDuplicate(hCommand * command)
 	return result;
 }
 
-void hScheduler::saintyCheck()
-{
-}
 
 
 
@@ -241,6 +238,16 @@ hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,
 	this->scheduleType = scheduleType;
 	this->_callbackFunction = callbackFunction;
 }
+
+hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, hPumpsController * controller, int payload)
+{
+	this->disposable = disposable;
+	this->scheduleTime = scheduleTime;
+	this->scheduleType = scheduleType;
+	this->payload = payload;
+	this->pumpsController = controller;
+}
+
 
 
 
@@ -324,6 +331,7 @@ void hPumpsController::createDailyPlan(bool holiday)  //daily plan factory
 		scht.tm_min = 0;
 		scht.tm_wday = 0;
 		_scheduler->addTask(new ntp_update(false, scht, daily, 123));
+		_scheduler->addTask(new hSanityCheckCommand(false, scht, minutly, this,0));
 
 }
 
@@ -361,10 +369,11 @@ void hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 		taskId = this->_scheduler->addExecuteTask(new hPumpCommand(true, tTime, hourly, pumpNumber));
 		//update config
 		_config->setPumpStatusOn(pumpNumber,actualTemp,setTemp); 
+		saintyCheck();
 	}
 }
 
-void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+void hPumpsController::turnOffHeatPumpReq(int pumpNumber)
 {
 	bool canTurnOff = true;
 	int taskId = 0;
@@ -382,6 +391,7 @@ void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 		//taskId=this->_scheduler->addTask(new hPumpCommand(true, tTime, hourly, pumpNumber+10));
 		taskId = this->_scheduler->addExecuteTask(new hPumpCommand(true, tTime, hourly, pumpNumber + 10));
 		_config->setPumpStatusOff(pumpNumber);
+		saintyCheck();
 	}
 }
 
@@ -400,6 +410,7 @@ void hPumpsController::turnOnCircPumpReq()
 	if ((tTime.tm_min+5) > 59) tTime.tm_min = tTime.tm_min - 60;
 	//tTime.tm_min = (minute()+5)>59 ? (minute()+5-59) : (minute()+5);
 	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, hourly, _DOMESTIC_WATER_PUMP_OFF));
+	saintyCheck();
 }
 
 void hPumpsController::turnOffCircPumpReq()
@@ -412,11 +423,16 @@ void hPumpsController::turnOffCircPumpReq()
 	tTime.tm_mday = day();
 	tTime.tm_wday = weekday();
 	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF));
+	saintyCheck();
 }
 
 void hPumpsController::saintyCheck()
 {
-	
+	for (int i = 0; i <= _MAX_HEATING_PUMPS_NO; i++) {
+		if (_config->getPumpRunningMinuts(i) >= _MAX_HEATING_PUMP_RUNNING_MINUTES) {
+			this->turnOffHeatPumpReq(i);
+		}
+	}
 	//search for pumps running longer than 24h
 }
 
@@ -428,3 +444,10 @@ bool hCallbackCommand::execute()
 	}else 
 	return false;
 }
+
+bool hSanityCheckCommand::execute()
+{
+	
+	return false;
+}
+
