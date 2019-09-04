@@ -1,4 +1,4 @@
-#define _CPPWIN 1
+#define _CPPWINa 1
 
 #include "scheduler.h"
 #include <iostream>
@@ -363,27 +363,10 @@ void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 {
 	bool canTurnOff = true;
 	int taskId = 0;
-	float tempModifier = 0;
-	if (hour() > 10 && hour() < 14) {
-		tempModifier = _MAX_DAY_OVERHEATING;
-	}
-	if (hour() > 22 && hour() < 6) {
-		tempModifier = _MAX_NIGHT_COOLING;
-	}
-	//check turn on off validation for example from config.history
-
-	//negative validations
-	if (pumpNumber < 0 || pumpNumber >= _DOMESTIC_WATER_PUMP) canTurnOff = false;
-	if (actualTemp < setTemp + _MAX_HEATING_TEMP_DELTA + tempModifier) canTurnOff = false;
-	if (actualTemp > _MAX_HEATING_INTERIOR_TEMP + tempModifier) canTurnOn = false;
-
-
-
+	if (pumpNumber < 0 || pumpNumber>3) canTurnOff = false;
 	//check last _MIN_PUMP_ONOFF_CYCLE minut history  for switch on - off
 	if (_config->lastOnOffPump(pumpNumber, _MIN_PUMP_ONOFF_CYCLE)>0) canTurnOff = false;
-	//cannot turn off not running pump
 	if (!_config->getPumpStatus(pumpNumber)) canTurnOff = false;
-
 	if (canTurnOff) {
 		//doing off pump action
 		tm tTime;
@@ -447,5 +430,3 @@ bool hCallbackCommand::execute()
 	}else 
 	return false;
 }
-
-

@@ -72,3 +72,9 @@ public:
 void setTime(uint32_t vtime);
 
 int random(int min, int max = 0);
+
+class MQTTClient {
+public:
+	void begin(const char* MQTT_Server, const char* WIFIc);
+	bool connect();
+};

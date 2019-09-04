@@ -1,4 +1,5 @@
 #include "heating_config.h"
+#include <TimeLib.h>
 #include "utils.h"
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -63,8 +64,8 @@ void setup() {
     delay(200);
 
 	}
-
   }
+
   counter=0;
   wynik=false;
   //Updating time from NTP time server
@@ -74,7 +75,7 @@ void setup() {
     hdisplay->renderScreen();
     counter++;
     wynik=ntpUpdateCommand.execute();
-    delay(200);
+    delay(300);
   }
   hdisplay->printStatusBar(ntpUpdateCommand.result);    
   hdisplay->renderScreen();
@@ -90,10 +91,10 @@ void setup() {
   timeMillis=0;
 // add periodical device discovery process
   t.tm_hour = hour();
-  t.tm_min = 1;
+  t.tm_min = 32;
   t.tm_mday = day();
   t.tm_wday = weekday();
- // scheduler->addTask(new hCallbackCommand(false, t,hourly, &hook_discover_devices));
+  scheduler->addTask(new hCallbackCommand(false, t,hourly, &hook_discover_devices));
   t.tm_min=31;
  // scheduler->addTask(new hCallbackCommand(false, t,hourly, &hook_discover_devices));  
 }
@@ -125,7 +126,7 @@ void loop() {
   if (udpMessenger.checkNewCommand()){
     tClientCommand temp = udpMessenger.getCurrentCommand();
     if (strcmp(temp.cmd,"ON")==0){
-          if (temp.ID>=0 && temp.ID<4){             
+          if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO){             
             char tm[20];
             sprintf(tm,"C%d heating ON",temp.ID+1);
             hdisplay->printStatusBar(tm);

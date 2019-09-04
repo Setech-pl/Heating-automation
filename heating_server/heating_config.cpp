@@ -1,4 +1,4 @@
-#define _CPPWIN 1
+#define _CPPWINa 1
 
 #include "heating_config.h"
 #ifdef _CPPWIN
@@ -70,7 +70,7 @@ bool hConfigurator::heatPumpsRunning()
 
 bool hConfigurator::circulationPumpsRunning()
 {
-	return _pumps[_DOMESTIC_WATER_PUMP].running;
+	return _pumps[4].running;
 };
 
 int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
@@ -113,7 +113,7 @@ int hConfigurator::getPercentage(int pumpNumber)
 	int all = 0;
 	float result = 0;
 	// get only stats from heat pumps 0-3 numbes
-	if (pumpNumber >= 0 && pumpNumber< _DOMESTIC_WATER_PUMP) {
+	if (pumpNumber >= 0 && pumpNumber< 4) {
 
 		for (int i = 0; i < 4; i++) {
 			all += _pumps[i].minuts;

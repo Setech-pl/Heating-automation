@@ -28,7 +28,7 @@ void hookTest() {
 }
 
 void hookExecuteSanityCheck() {
-	heatPumpController->saintyCheck();
+	heatPumpController->sanityCheck();
 }
 
 void createDailyPlans() {
