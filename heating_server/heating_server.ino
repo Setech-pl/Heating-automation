@@ -23,9 +23,17 @@ UDPMessengerService udpMessenger(3636);
 unsigned long timeMillis = 0;
 
 
-
+/*
+ * 
+ * Hook functions
+ */
 void hook_discover_devices(){
   udpMessenger.discoverDevices();    
+}
+
+
+void hook_sanity_check(){
+  heatPumpController->sanityCheck();
 }
 
 void setup() {
@@ -62,12 +70,11 @@ void setup() {
 	    wynik = internalWifiCmd.execute();  
 		counter++;
     delay(200);
-
 	}
   }
-
   counter=0;
   wynik=false;
+
   //Updating time from NTP time server
   while (!wynik && counter<5){;
     sprintf(temp,"Updating NTP(%d)  ",counter);
@@ -89,16 +96,28 @@ void setup() {
   hdisplay->renderScreen();
   delay(1000);    
   timeMillis=0;
+  
 // add periodical device discovery process
   t.tm_hour = hour();
   t.tm_min = 32;
   t.tm_mday = day();
   t.tm_wday = weekday();
   scheduler->addTask(new hCallbackCommand(false, t,hourly, &hook_discover_devices));
-  t.tm_min=31;
- // scheduler->addTask(new hCallbackCommand(false, t,hourly, &hook_discover_devices));  
-}
 
+// add periodical sanity check  
+  t.tm_hour = 3;
+  t.tm_min = 1;
+  t.tm_mday = day();
+  t.tm_wday = weekday();  
+  scheduler->addTask(new hCallbackCommand(false, t,daily, &hook_discover_devices));
+
+// add periodical NTP Time update
+  t.tm_hour = 0;
+  t.tm_min = 10;
+  t.tm_mday = day();
+  t.tm_wday = weekday();  
+  scheduler->addTask(new ntp_update(false,t,daily,0) );
+}
 
 
 void loop() {

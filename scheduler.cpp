@@ -374,8 +374,8 @@ void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 
 	//negative validations
 	if (pumpNumber < 0 || pumpNumber >= _DOMESTIC_WATER_PUMP) canTurnOff = false;
-	if (actualTemp < setTemp + _MAX_HEATING_TEMP_DELTA + tempModifier) canTurnOff = false;
-	if (actualTemp > _MAX_HEATING_INTERIOR_TEMP + tempModifier) canTurnOn = false;
+	//if (actualTemp <= setTemp + _MAX_HEATING_TEMP_DELTA + tempModifier) canTurnOff = false;
+	//if (actualTemp > _MAX_HEATING_INTERIOR_TEMP + tempModifier) canTurnOff = false;
 
 
 

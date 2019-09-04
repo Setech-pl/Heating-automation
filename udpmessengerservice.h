@@ -30,6 +30,7 @@
   float targetTEMP;
   char serialID[32];
   char versionC[12];
+  IPAddress senderIP;
  };
 
 class UDPMessengerService {

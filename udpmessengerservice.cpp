@@ -57,6 +57,7 @@ void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort
     strcpy(_currentCommand.cmd,cmd);
     _currentCommand.actualTEMP = atof(actualTEMP);
     _currentCommand.targetTEMP = atof(targetTEMP);
+	_currentCommand.senderIP = senderIp;
 
    //Now i have to send back OK message
    
