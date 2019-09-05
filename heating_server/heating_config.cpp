@@ -70,7 +70,7 @@ bool hConfigurator::heatPumpsRunning()
 
 bool hConfigurator::circulationPumpsRunning()
 {
-	return _pumps[4].running;
+	return _pumps[_DOMESTIC_WATER_PUMP].running;
 };
 
 int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
@@ -113,7 +113,7 @@ int hConfigurator::getPercentage(int pumpNumber)
 	int all = 0;
 	float result = 0;
 	// get only stats from heat pumps 0-3 numbes
-	if (pumpNumber >= 0 && pumpNumber< 4) {
+	if (pumpNumber >= 0 && pumpNumber< _DOMESTIC_WATER_PUMP) {
 
 		for (int i = 0; i < 4; i++) {
 			all += _pumps[i].minuts;
