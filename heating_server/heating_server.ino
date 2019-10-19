@@ -36,6 +36,11 @@ void hook_sanity_check(){
   heatPumpController->sanityCheck();
 }
 
+void  hook_restart(){
+  ESP.restart();
+}
+
+
 void setup() {
   int counter=0;
   bool wynik = false; 
@@ -117,10 +122,22 @@ void setup() {
   t.tm_mday = day();
   t.tm_wday = weekday();  
   scheduler->addTask(new ntp_update(false,t,daily,0) );
+
+// add periodical RESTART
+/*
+  t.tm_hour = 0;
+  t.tm_min = 10;
+  t.tm_mday = 1;
+  t.tm_wday = 1; 
+  t.tm_month = month() + 1;
+  if (t.tm_month>12) { t.tm_month = 1; }   
+  scheduler->addTask(new hCallbackCommand(false, t,monthly, &hook_restart)); 
+  */ 
 }
 
 
 void loop() {
+  delay(1);
   if (timeMillis+1000< millis()){
     scheduler->executeTasks();    
     config->tickMinutes();
@@ -147,20 +164,20 @@ void loop() {
     if (strcmp(temp.cmd,"ON")==0){
           if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO){             
             char tm[20];
-            sprintf(tm,"C%d heating ON",temp.ID+1);
+            sprintf(tm,"Pump %d sends ON",temp.ID+1);
             hdisplay->printStatusBar(tm);
             hdisplay->renderScreen();
-            heatPumpController->turnOnHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP);
+            udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP));
             timeMillis=millis();
           }
     }    
     if (strcmp(temp.cmd,"OFF")==0){ 
           if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO ){       
             char tm[20];
-            sprintf(tm,"C%d heating OFF",temp.ID+1);
+            sprintf(tm,"Pump %d sends OFF",temp.ID+1);
             hdisplay->printStatusBar(tm);    
             hdisplay->renderScreen();
-            heatPumpController->turnOffHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP);      
+            udpMessenger.sendBackMessage(heatPumpController->turnOffHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP));      
             timeMillis=millis();          
           }
     } 

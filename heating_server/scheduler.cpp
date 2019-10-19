@@ -1,4 +1,4 @@
-#define _CPPWINa 1
+
 
 #include "scheduler.h"
 #include <iostream>
@@ -327,7 +327,7 @@ void hPumpsController::removeDailyPlan(int pumpNumber)
 	_scheduler->removeCommands(pumpNumber+10);
 }
 
-void hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
 	bool canTurnOn = true;
 	int taskId=0;
@@ -357,9 +357,10 @@ void hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 		_config->setPumpStatusOn(pumpNumber,actualTemp,setTemp); 
 		sanityCheck();
 	}
+	return canTurnOn;
 }
 
-void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
 	bool canTurnOff = true;
 	int taskId = 0;
@@ -396,6 +397,7 @@ void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 		_config->setPumpStatusOff(pumpNumber);
 		sanityCheck();
 	}
+	return canTurnOff;
 }
 
 void hPumpsController::turnOnCircPumpReq()

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
+int month();
 int weekday();
 int hour();
 int minute();

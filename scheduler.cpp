@@ -190,6 +190,19 @@ bool hScheduler::checkSchedule(int cNumber)
 			return false;
 		}
 		break;
+	
+	case monthly:
+		if (commands[cNumber]->scheduleTime.tm_mon == month() && commands[cNumber]->scheduleTime.tm_hour == hour() && commands[cNumber]->scheduleTime.tm_min == minute()) {
+			commands[cNumber]->scheduleTime.tm_mon++;
+			if (commands[cNumber]->scheduleTime.tm_mon > 12) {
+				commands[cNumber]->scheduleTime.tm_mon = 1;
+			}
+			return true;
+		}
+		else {
+			return false;
+		}
+		break;
 	}
 
 	return false;
@@ -327,7 +340,7 @@ void hPumpsController::removeDailyPlan(int pumpNumber)
 	_scheduler->removeCommands(pumpNumber+10);
 }
 
-void hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
 	bool canTurnOn = true;
 	int taskId=0;
@@ -357,9 +370,10 @@ void hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 		_config->setPumpStatusOn(pumpNumber,actualTemp,setTemp); 
 		sanityCheck();
 	}
+	return canTurnOn;
 }
 
-void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
 	bool canTurnOff = true;
 	int taskId = 0;
@@ -396,6 +410,7 @@ void hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 		_config->setPumpStatusOff(pumpNumber);
 		sanityCheck();
 	}
+	return canTurnOff;
 }
 
 void hPumpsController::turnOnCircPumpReq()

@@ -13,8 +13,12 @@ int random(int min, int max ) {
 
 }
 
+int month() {
+	return 1+rand() % 12;
+}
+
 int weekday() {
-	return rand()%6;
+	return 1+rand()%7;
 	//return 6;
 }
 

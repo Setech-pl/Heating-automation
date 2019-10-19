@@ -24,7 +24,7 @@ hPumpsController* heatPumpController = new hPumpsController(dyro, config);
 //global hook functions
 
 void hookTest() {
-	//std::cout << "\n hook function";
+	std::cout << "\n hook function called by monthly schedule";
 }
 
 void hookExecuteSanityCheck() {
@@ -55,7 +55,8 @@ int main()
 	time.tm_min = minute();
 	time.tm_wday = weekday();
 	time.tm_mday = day();
-	hCallbackCommand* tt = new hCallbackCommand(false, time, minutly, &hookTest);
+	time.tm_mon = month();
+	hCallbackCommand* tt = new hCallbackCommand(false, time, monthly, &hookTest);
 	dyro->addTask(tt);
 	dyro->addTask(new enable_internal_wifi(true, time, minutly, 0));
 	createDailyPlans();

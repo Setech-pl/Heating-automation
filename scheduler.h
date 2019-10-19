@@ -8,7 +8,9 @@
 enum escheduleType {
 	daily = 0,
 	hourly = 1,
-	minutly = 2
+	minutly = 2,
+	weekly  = 3,
+	monthly = 4
 };
 
 class hCommand {
@@ -76,8 +78,8 @@ public:
 	hPumpsController(hScheduler *scheduler, hConfigurator *config);
 	void createDailyPlan(bool holiday );
 	void removeDailyPlan(int pumpNumber); //removes plan for pump number /1-5/
-	void turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
-	void turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
+	bool turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
+	bool turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
 	void turnOnCircPumpReq();
 	void turnOffCircPumpReq();
 	void sanityCheck();
