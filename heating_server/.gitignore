@@ -3,3 +3,5 @@ secrets.h
 *.log
 Debug/
 .vs/
+pch.h
+pch.cpp

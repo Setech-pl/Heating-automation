@@ -1,4 +1,3 @@
-#define _CPPWINa 1
 
 #include "heating_config.h"
 #ifdef _CPPWIN

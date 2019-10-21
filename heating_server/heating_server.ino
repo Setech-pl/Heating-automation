@@ -1,8 +1,9 @@
+
+#include <LiquidCrystal_I2C_Hangul.h>
 #include "heating_config.h"
 #include <TimeLib.h>
 #include "utils.h"
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 #include "scheduler.h"
 #include <ESP8266WiFi.h>
 #include <NTPClient.h>
@@ -13,7 +14,7 @@
 
 
 
-LiquidCrystal_I2C lcd(0x27,20,4);
+LiquidCrystal_I2C_Hangul lcd(0x27,20,4);
 
 hScheduler* scheduler  = new hScheduler();
 hConfigurator* config = new hConfigurator();
@@ -28,20 +29,24 @@ unsigned long timeMillis = 0;
  * Hook functions
  */
 void hook_discover_devices(){
-  udpMessenger.discoverDevices();    
+//  udpMessenger.discoverDevices();    
 }
 
 
 void hook_sanity_check(){
-  heatPumpController->sanityCheck();
+  //heatPumpController->sanityCheck();
 }
 
 void  hook_restart(){
-  ESP.restart();
+//  ESP.restart();
 }
 
 
 void setup() {
+Serial.begin(115200);
+delay(100);
+Serial.println('tutaj jesttem');
+delay(1000);
   int counter=0;
   bool wynik = false; 
   char temp[21];
@@ -123,33 +128,17 @@ void setup() {
   t.tm_wday = weekday();  
   scheduler->addTask(new ntp_update(false,t,daily,0) );
 
-// add periodical RESTART
-/*
-  t.tm_hour = 0;
-  t.tm_min = 10;
-  t.tm_mday = 1;
-  t.tm_wday = 1; 
-  t.tm_month = month() + 1;
-  if (t.tm_month>12) { t.tm_month = 1; }   
-  scheduler->addTask(new hCallbackCommand(false, t,monthly, &hook_restart)); 
-  */ 
 }
 
 
 void loop() {
-  delay(1);
+
   if (timeMillis+1000< millis()){
     scheduler->executeTasks();    
     config->tickMinutes();
   }
   if (timeMillis+5000< millis()){
-    /*
-    hdisplay->nextMenu(10);
-    hdisplay->printMenu();
-    hdisplay->renderScreen();
-    hdisplay->clearScreen();
-    timeMillis = millis();    
-    */
+
     hdisplay->printMainScreen();    
     hdisplay->printStatusBar(_BLANK_LINE);
     hdisplay->renderScreen();

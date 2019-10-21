@@ -7,7 +7,6 @@
 #include "scheduler.h"
 
 #ifndef _CPPWIN
-#include <LiquidCrystal_I2C.h>
 #else
 #include "arduino_stub.h"
 #endif
@@ -66,7 +65,7 @@ void hScreen::noBackLight()
 
 
 
-hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
+hScreen::hScreen(LiquidCrystal_I2C_Hangul* lcd, hConfigurator* config){
   _config = config;
   _lcd=lcd;
   for (int i=0; i<4; i++){

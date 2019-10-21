@@ -1,5 +1,4 @@
 
-
 #include "scheduler.h"
 #include <iostream>
 #include <time.h>
@@ -183,6 +182,19 @@ bool hScheduler::checkSchedule(int cNumber)
 			commands[cNumber]->scheduleTime.tm_min++;
 			if (commands[cNumber]->scheduleTime.tm_min > 59) {
 				commands[cNumber]->scheduleTime.tm_min = 0;
+			}
+			return true;
+		}
+		else {
+			return false;
+		}
+		break;
+	
+	case monthly:
+		if (commands[cNumber]->scheduleTime.tm_mon == month() && commands[cNumber]->scheduleTime.tm_hour == hour() && commands[cNumber]->scheduleTime.tm_min == minute()) {
+			commands[cNumber]->scheduleTime.tm_mon++;
+			if (commands[cNumber]->scheduleTime.tm_mon > 12) {
+				commands[cNumber]->scheduleTime.tm_mon = 1;
 			}
 			return true;
 		}

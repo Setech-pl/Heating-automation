@@ -8,8 +8,9 @@
 enum escheduleType {
 	daily = 0,
 	hourly = 1,
-	minutly = 2
- 
+	minutly = 2,
+	weekly  = 3,
+	monthly = 4
 };
 
 class hCommand {
@@ -88,3 +89,5 @@ private:
 
 
 };
+
+

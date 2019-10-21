@@ -2,10 +2,10 @@
 #pragma once
 
 #ifndef _CPPWIN 
-  #include <LiquidCrystal_I2C.h>
   #include <Time.h>
   #include <TimeLib.h>
   #include <ESP8266WiFi.h>  
+ #include <LiquidCrystal_I2C_Hangul.h>
 #else
   #include "arduino_stub.h"
 #endif // _CPPWIN
@@ -17,7 +17,7 @@ const char _BLANK_LINE[21] = "                    ";
 
 class hScreen {
 	public:
-    hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config);
+    hScreen(LiquidCrystal_I2C_Hangul* lcd, hConfigurator* config);
 	void printStatusBar(const char Msg[]);
     void printMainScreen(); 
     void printSplashScreen(); 
@@ -41,7 +41,7 @@ class hScreen {
     char _lines[4][21];    
     bool checkLinesChanges(int lineNumber);
 	bool _backLight = false;
-    LiquidCrystal_I2C* _lcd;
+    LiquidCrystal_I2C_Hangul* _lcd;
 	hConfigurator* _config;
 
 };
