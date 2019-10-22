@@ -2,8 +2,6 @@
 #pragma once
 #include <time.h>
 #include "heating_config.h"
-#include <stdlib.h>
-
 
 enum escheduleType {
 	daily = 0,
@@ -89,5 +87,3 @@ private:
 
 
 };
-
-

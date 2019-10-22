@@ -68,7 +68,7 @@ bool enable_internal_wifi::execute()
 	WiFi.mode(WIFI_AP_STA);
 	while (!wynik and counter < 2) {
 		counter++;
-		wynik = WiFi.softAP(_INTERNAL_WIFI_SID, _INTERNAL_WIFI_PASS);
+		wynik = WiFi.softAP(_INTERNAL_WIFI_SID, _INTERNAL_WIFI_PASS,6,false,10);
 		delay(500);
 	}
 	if (wynik) {

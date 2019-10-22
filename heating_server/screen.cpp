@@ -65,7 +65,7 @@ void hScreen::noBackLight()
 
 
 
-hScreen::hScreen(LiquidCrystal_I2C_Hangul* lcd, hConfigurator* config){
+hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
   _config = config;
   _lcd=lcd;
   for (int i=0; i<4; i++){
@@ -75,7 +75,7 @@ hScreen::hScreen(LiquidCrystal_I2C_Hangul* lcd, hConfigurator* config){
 };
 
 void hScreen::printSplashScreen(){
-  strcpy(this->lines[0],"Heating server v 0.1");
+  strcpy(this->lines[0],"Heating server v 0.2");
   strcpy(this->lines[1],"(c) 2018/19 Marceli ");
   strcpy(this->lines[2],_BLANK_LINE);
   strcpy(this->lines[3],_BLANK_LINE);  
@@ -164,6 +164,7 @@ void hScreen::renderScreen(){
 		if (checkLinesChanges(i) || _clearScreen) {
 			_lcd->setCursor(0, i);
 			_lcd->print(this->getLine(i));
+      Serial.println(this->getLine(i));
 			strcpy(this->_lines[i], this->getLine(i));
 		}
     }

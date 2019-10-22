@@ -1,5 +1,5 @@
 
-#include <LiquidCrystal_I2C_Hangul.h>
+#include <LiquidCrystal_I2C.h>
 #include "heating_config.h"
 #include <TimeLib.h>
 #include "utils.h"
@@ -13,8 +13,7 @@
 #include "UDPMessengerService.h"
 
 
-
-LiquidCrystal_I2C_Hangul lcd(0x27,20,4);
+LiquidCrystal_I2C lcd(0x27,20,4);
 
 hScheduler* scheduler  = new hScheduler();
 hConfigurator* config = new hConfigurator();
@@ -22,7 +21,7 @@ hPumpsController* heatPumpController  = new hPumpsController(scheduler, config);
 hScreen* hdisplay= new hScreen(&lcd, config);
 UDPMessengerService udpMessenger(3636);
 unsigned long timeMillis = 0;
-
+bool internalWIFIMode = false;
 
 /*
  * 
@@ -44,9 +43,8 @@ void  hook_restart(){
 
 void setup() {
 Serial.begin(115200);
-delay(100);
-Serial.println('tutaj jesttem');
-delay(1000);
+Serial.println("Entering setup mode");
+delay(500);
   int counter=0;
   bool wynik = false; 
   char temp[21];
@@ -57,34 +55,33 @@ delay(1000);
   lcd.backlight(); // Enable or Turn On the backlight 
   hdisplay->printSplashScreen();
   hdisplay->renderScreen(); 
-  delay(1000);    
+  delay(200);    
   while (!wynik && counter<5){
     sprintf(temp,"Connecting WiFi(%d)",counter);
     hdisplay->printStatusBar(temp);            
     hdisplay->renderScreen();    
     wynik = connExternalWiFi.execute();    
-	counter++;
-    delay(200);
+	  counter++;
+    delay(500);
   } 
   hdisplay->printStatusBar(connExternalWiFi.result);            
   hdisplay->renderScreen();  
   delay(1000);  
   if (!wynik){
-	// I have to turn on internal WiFi
-	enable_internal_wifi internalWifiCmd(true,t,hourly,0);
-	counter = 0;
-	while(!wynik && counter < 5){
-	    sprintf(temp,"Internal WiFi(%d)",counter);
-	    hdisplay->printStatusBar(temp);            
-	    hdisplay->renderScreen();    
-	    wynik = internalWifiCmd.execute();  
-		counter++;
-    delay(200);
-	}
+  	// I have to turn on internal WiFi
+  	enable_internal_wifi internalWifiCmd(true,t,hourly,0);
+  	counter = 0;
+  	while(!internalWIFIMode && counter < 5){
+  	    sprintf(temp,"Internal WiFi(%d)",counter);
+  	    hdisplay->printStatusBar(temp);            
+  	    hdisplay->renderScreen();    
+  	    internalWIFIMode = internalWifiCmd.execute();
+  		counter++;
+      delay(200);
+  	}
   }
   counter=0;
   wynik=false;
-
   //Updating time from NTP time server
   while (!wynik && counter<5){;
     sprintf(temp,"Updating NTP(%d)  ",counter);
@@ -101,10 +98,14 @@ delay(1000);
 
   hook_discover_devices();
   char hr[21];
-  sprintf(hr," IP : %d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);      
+  if (!internalWIFIMode){
+    sprintf(hr," IP : %d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);  
+  }else {
+    sprintf(hr," IP : %d.%d.%d.%d", WiFi.softAPIP()[0],WiFi.softAPIP()[1],WiFi.softAPIP()[2],WiFi.softAPIP()[3]);       
+  }
   hdisplay->printStatusBar(hr);  
   hdisplay->renderScreen();
-  delay(1000);    
+  delay(3000);    
   timeMillis=0;
   
 // add periodical device discovery process
@@ -153,7 +154,7 @@ void loop() {
     if (strcmp(temp.cmd,"ON")==0){
           if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO){             
             char tm[20];
-            sprintf(tm,"Pump %d sends ON",temp.ID+1);
+            sprintf(tm,"Pump %d ON",temp.ID+1);
             hdisplay->printStatusBar(tm);
             hdisplay->renderScreen();
             udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP));
@@ -163,7 +164,7 @@ void loop() {
     if (strcmp(temp.cmd,"OFF")==0){ 
           if (temp.ID>=0 && temp.ID<_MAX_HEATING_PUMPS_NO ){       
             char tm[20];
-            sprintf(tm,"Pump %d sends OFF",temp.ID+1);
+            sprintf(tm,"Pump %d OFF",temp.ID+1);
             hdisplay->printStatusBar(tm);    
             hdisplay->renderScreen();
             udpMessenger.sendBackMessage(heatPumpController->turnOffHeatPumpReq(temp.ID,temp.actualTEMP,temp.targetTEMP));      
@@ -178,5 +179,6 @@ void loop() {
           hook_discover_devices();                        
     }
   }
-
+  yield();
+  delay(1);
 }
