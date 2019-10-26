@@ -54,5 +54,5 @@ public:
   void discoverDevices(); //send broadCast Packet
   tClientCommand getCurrentCommand();
   bool checkNewCommand();
-  void sendBackMessage(bool status);
-};
+  void sendBackMessage(bool status, bool runningStatus);
+  void setTempFromMQTT(float temps[_MAX_HEATING_PUMPS_NO]);

@@ -4,7 +4,6 @@
 #define _EXTERNAL_WIFI_PASS ""
 #define _INTERNAL_WIFI_SID ""
 #define _INTERNAL_WIFI_PASS ""
-
 #include "secrets.h"
 const bool _INTERNAL_WIFI_MODE = false;
 

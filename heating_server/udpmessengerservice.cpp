@@ -20,6 +20,7 @@ void UDPMessengerService::listen()
     int len = _udp.read(incomingPacket, _MAX_PACKET_SIZE);
     if (len > 0)
     {
+
       incomingPacket[len] = 0;
     }
     processMessage(_udp.remoteIP(), _udp.remotePort(), incomingPacket);
@@ -51,6 +52,7 @@ void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort
 {
   StaticJsonBuffer<_MAX_PACKET_SIZE> jsonBuffer;
   JsonObject &root = jsonBuffer.parseObject(message);
+  Serial.println("process msg");
   if (root.success())
   {
     _commandFlag = true;
@@ -71,7 +73,7 @@ void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort
 
 //Now i have to send back OK or NO message
 
-void UDPMessengerService::sendBackMessage(bool status)
+void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
 {
   char resultBuffer[_MAX_PACKET_SIZE] = "";
   StaticJsonBuffer<_MAX_PACKET_SIZE> jsonBuffer;
@@ -83,6 +85,14 @@ void UDPMessengerService::sendBackMessage(bool status)
   else
   {
     backmsg["cmd"] = "NO";
+  }
+  if (runningStatus)
+  {
+    backmsg["runningStatus"] = "YES";
+  }
+  else
+  {
+    backmsg["runningStatus"] = "NO";
   }
   char hr[21];
   sprintf(hr, "%d", now());
@@ -123,4 +133,8 @@ bool UDPMessengerService::checkNewCommand()
   }
   else
     return false;
+}
+
+void UDPMessengerService::setTempFromMQTT(float temps[])
+{
 }
