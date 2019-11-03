@@ -204,6 +204,6 @@ void loop()
     //incoming external command - set temp to Thermo Client ID
     float tablicaTemp[_MAX_HEATING_PUMPS_NO];
     tablicaTemp[0] = 33.2;
-    udpMessenger.setTempFromMQTT(tablicaTemp);
+ //  udpMessenger.setTempFromMQTT(tablicaTemp);
   }
 }
