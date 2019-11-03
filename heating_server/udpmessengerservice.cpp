@@ -88,11 +88,11 @@ void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
   }
   if (runningStatus)
   {
-    backmsg["runningStatus"] = "YES";
+    backmsg["RUNNING"] = "YES";
   }
   else
   {
-    backmsg["runningStatus"] = "NO";
+    backmsg["RUNNING"] = "NO";
   }
   char hr[21];
   sprintf(hr, "%d", now());
@@ -100,6 +100,8 @@ void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
   sprintf(hr, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   backmsg["SERVERIP"] = hr;
   backmsg.printTo(resultBuffer, _MAX_PACKET_SIZE);
+  Serial.println("sendBackMessage");
+  Serial.println(_lastSenderIp);
   sendPacket(_lastSenderIp, false, _lastSenderPort, resultBuffer);
 }
 
@@ -135,6 +137,22 @@ bool UDPMessengerService::checkNewCommand()
     return false;
 }
 
-void UDPMessengerService::setTempFromMQTT(float temps[])
+void UDPMessengerService::setTempFromMQTT(tClientCommand mqttCommand)
 {
+  IPAddress broadcastIP = WiFi.localIP();
+  char hr[21];
+  char resultBuffer[_MAX_PACKET_SIZE] = "";
+  sprintf(hr, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  broadcastIP[3] = 255;
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject &result = jsonBuffer.createObject();
+  result["cmd"] = "MQTTSET";
+  result["ID"] = mqttCommand.ID;
+  result["SERVERIP"] = hr;
+  sprintf(hr, "%d", now());
+  result["TIME"] = hr;
+  sprintf(hr,  "%f", mqttCommand.targetTEMP);
+  result["targetTEMP"] = hr;
+  result.printTo(resultBuffer, _MAX_PACKET_SIZE);
+  sendPacket(broadcastIP, true, _listenPort, resultBuffer);
 }

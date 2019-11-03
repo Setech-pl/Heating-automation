@@ -15,7 +15,8 @@
 "serial":"123456",
 "versionC":"1.1",
 "actualTEMP":"36.6",
-"targetTEMP":"38.6"
+"targetTEMP":"38.6",
+"actualHumidity":"90"
 }
 
 
@@ -25,9 +26,10 @@
 struct tClientCommand
 {
   int ID;
-  char cmd[16];
+  char cmd[20];
   float actualTEMP;
   float targetTEMP;
+  float actualHum;
   char serialID[32];
   char versionC[12];
 };
@@ -55,4 +57,5 @@ public:
   tClientCommand getCurrentCommand();
   bool checkNewCommand();
   void sendBackMessage(bool status, bool runningStatus);
-  void setTempFromMQTT(float temps[_MAX_HEATING_PUMPS_NO]);
+  void setTempFromMQTT(tClientCommand mqttCommand);
+};

@@ -1,3 +1,4 @@
+#define _CPPWIN 1
 #define _CRT_SECURE_NO_WARNINGS
 #include "screen.h"
 #include "heating_config.h"
@@ -6,9 +7,7 @@
 #include  <string.h>
 #include "scheduler.h"
 
-#ifndef _CPPWIN
-#include <LiquidCrystal_I2C.h>
-#else
+#ifdef _CPPWIN
 #include "arduino_stub.h"
 #endif
 
@@ -76,7 +75,7 @@ hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
 };
 
 void hScreen::printSplashScreen(){
-  strcpy(this->lines[0],"Heating server v 0.1");
+  strcpy(this->lines[0],"Heating server v 0.2");
   strcpy(this->lines[1],"(c) 2018/19 Marceli ");
   strcpy(this->lines[2],_BLANK_LINE);
   strcpy(this->lines[3],_BLANK_LINE);  
@@ -165,6 +164,9 @@ void hScreen::renderScreen(){
 		if (checkLinesChanges(i) || _clearScreen) {
 			_lcd->setCursor(0, i);
 			_lcd->print(this->getLine(i));
+#ifndef _CPPWIN
+			Serial.println(this->getLine(i));
+#endif // !_CPPWIN
 			strcpy(this->_lines[i], this->getLine(i));
 		}
     }

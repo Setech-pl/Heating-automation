@@ -1,5 +1,4 @@
 #define _CPPWIN 1
-
 #define _CRT_SECURE_NO_WARNINGS
 #include "utils.h"
 #include "heating_config.h"
@@ -23,7 +22,7 @@ bool ntp_update::execute(){
      WiFiUDP ntpUDP;    
      NTPClient timeClient(ntpUDP, "0.pl.pool.ntp.org", 3600, 60000);
 		
-	 timeClient.begin();
+	  timeClient.begin();
    
     if (timeClient.update()){
       strcpy(this->result,"NTP update OK     ");
@@ -43,6 +42,7 @@ bool connect_external_wifi::execute(){
 
   int counter=0;  
   WiFi.disconnect();  
+  WiFi.mode(WIFI_STA);
   WiFi.begin(_EXTERNAL_WIFI_SID,_EXTERNAL_WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED and counter<10) {
     counter++;
@@ -68,7 +68,7 @@ bool enable_internal_wifi::execute()
 	WiFi.mode(WIFI_AP_STA);
 	while (!wynik and counter < 2) {
 		counter++;
-		wynik = WiFi.softAP(_INTERNAL_WIFI_SID, _INTERNAL_WIFI_PASS);
+		wynik = WiFi.softAP(_INTERNAL_WIFI_SID, _INTERNAL_WIFI_PASS,6,false,10);
 		delay(500);
 	}
 	if (wynik) {

@@ -4,7 +4,6 @@
 #define _EXTERNAL_WIFI_PASS ""
 #define _INTERNAL_WIFI_SID ""
 #define _INTERNAL_WIFI_PASS ""
-
 #include "secrets.h"
 const bool _INTERNAL_WIFI_MODE = false;
 
@@ -16,15 +15,16 @@ const bool _INTERNAL_WIFI_MODE = false;
 
 //heating & domestic pumps management
 
-#define _MIN_PUMP_ONOFF_CYCLE 0
-#define _MAX_HEATING_INTERIOR_TEMP 26
+#define _MIN_MINUTS_FROM_LAST_START 5
+#define _MAX_HEATING_INTERIOR_TEMP 28
 #define _MAX_HEATING_TEMP_DELTA 0.7 
 #define _MAX_HEATING_PUMPS_NO 4
 #define _MAX_DAY_OVERHEATING 1
 #define _MAX_NIGHT_COOLING -2
 #define _MAX_HEATING_PUMP_RUNNING_MINUTES 143
+#define _DISABLE_MAX_ONOFF_VALIDATION false
 const int _PRIORITY_ARRAY[_MAX_HEATING_PUMPS_NO] = { 2,2,1,0 }; //Priority array, 
-const int _DOMESTIC_WATER_PUMP = 4; //0,1,2,3 heating pumps, 4 water pump
+const int _DOMESTIC_WATER_PUMP = 5; //1,2,3,4 heating pumps, 5 water pump
 const int _DOMESTIC_WATER_PUMP_OFF = _DOMESTIC_WATER_PUMP + 10;
 
 

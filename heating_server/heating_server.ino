@@ -41,6 +41,61 @@ void hook_restart()
   ESP.restart();
 }
 
+/*
+Special setup functions
+*/
+
+void createPlanForDomesticWaterPump()
+{
+  tm scht;
+  //create normal daily plan for  domestic hot water circulation pump
+  scht.tm_hour = 5;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, (int)_DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 5;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, (int)_DOMESTIC_WATER_PUMP_OFF));
+  /*
+  scht.tm_hour = 6;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 6;
+  scht.tm_min = 40;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+
+  scht.tm_hour = 14;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 14;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  scht.tm_hour = 16;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 16;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  scht.tm_hour = 18;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 18;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  scht.tm_hour = 20;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 20;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  scht.tm_hour = 22;
+  scht.tm_min = 0;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  scht.tm_hour = 22;
+  scht.tm_min = 30;
+  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  */
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -146,10 +201,6 @@ void loop()
   {
     scheduler->executeTasks();
     config->tickMinutes();
-  }
-  if (timeMillis + 2000 < millis())
-  {
-
     hdisplay->printMainScreen();
     hdisplay->printStatusBar(_BLANK_LINE);
     hdisplay->renderScreen();
@@ -160,41 +211,43 @@ void loop()
   //Incoming commands router
 
   if (udpMessenger.checkNewCommand())
+
   {
-    Serial.println("command incoming");
     tClientCommand temp = udpMessenger.getCurrentCommand();
+
     if (strcmp(temp.cmd, "ON") == 0)
     {
-      //  if (temp.ID >= 0 && temp.ID < _MAX_HEATING_PUMPS_NO)
-      //  {
       char tm[20];
-      sprintf(tm, "Pump %d ON", temp.ID + 1);
+      sprintf(tm, "Pump %d ON Command", temp.ID);
+      hdisplay->printMainScreen();
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
-      // send back actual status of running pump
       udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
-      timeMillis = millis();
-      //   }
     }
+
     if (strcmp(temp.cmd, "OFF") == 0)
     {
-      if (temp.ID >= 0 && temp.ID < _MAX_HEATING_PUMPS_NO)
-      {
-        char tm[20];
-        sprintf(tm, "Pump %d OFF", temp.ID + 1);
-        hdisplay->printStatusBar(tm);
-        hdisplay->renderScreen();
-        udpMessenger.sendBackMessage(heatPumpController->turnOffHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
-        timeMillis = millis();
-      }
+      char tm[20];
+      sprintf(tm, "Pump %d OFF", temp.ID);
+      hdisplay->printMainScreen();
+      hdisplay->printStatusBar(tm);
+      hdisplay->renderScreen();
+      udpMessenger.sendBackMessage(heatPumpController->turnOffHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
     }
+
     if (strcmp(temp.cmd, "SHOWSERVER") == 0)
     {
       char tm[20];
-      sprintf(tm, "Registering C%d", temp.ID + 1);
+      sprintf(tm, "Registering C%d", temp.ID);
+      hdisplay->printMainScreen();
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
       hook_discover_devices();
+    }
+
+    if (strcmp(temp.cmd, "SHOWSTATUS") == 0)
+    {
+      udpMessenger.sendBackMessage(true, config->getPumpStatus(temp.ID));
     }
   }
 
@@ -202,8 +255,5 @@ void loop()
   if (false)
   {
     //incoming external command - set temp to Thermo Client ID
-    float tablicaTemp[_MAX_HEATING_PUMPS_NO];
-    tablicaTemp[0] = 33.2;
- //  udpMessenger.setTempFromMQTT(tablicaTemp);
   }
 }

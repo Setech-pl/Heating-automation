@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <string>
 
-cSerial Serial;
+
 
 int random(int min, int max ) {
 	return rand() % max + min;
@@ -121,8 +121,8 @@ IPAdress WiFiUDP::localIP()
 {
 	return IPAdress();
 }
-
-bool WiFiUDP::softAP(const char sid[14], const char pass[26])
+//wynik = WiFi.softAP(_INTERNAL_WIFI_SID, _INTERNAL_WIFI_PASS,6,false,10);//
+bool WiFiUDP::softAP(const char sid[14], const char pass[26], int channel, bool aut, int subchannel)
 {
 	std::cout << "enabling software AP sid";
 	std::cout << sid;
@@ -140,8 +140,4 @@ bool WiFiUDP::mode(WIFI_MODES changeMode)
 
 
 
-void cSerial::println(const char * msg)
-{
-	std::cout << "\n";
-	std::cout << msg;
-}
+

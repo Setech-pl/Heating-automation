@@ -1,5 +1,4 @@
 #define _CPPWIN 1
-
 #include "heating_config.h"
 #ifdef _CPPWIN
 #include "arduino_stub.h"
@@ -13,7 +12,7 @@
 
 void hConfigurator::setPumpStatusOn(int pumpNumber, float actualTemp, float setTemp)
 {
-	if (pumpNumber >= 0 && pumpNumber <= _DOMESTIC_WATER_PUMP) {
+	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP) {
 		_pumps[pumpNumber].running = true;
 		_pumps[pumpNumber].start_minute = minute();
 		_pumps[pumpNumber].start_hour = hour();
@@ -27,7 +26,7 @@ void hConfigurator::setPumpStatusOn(int pumpNumber, float actualTemp, float setT
 
 void hConfigurator::setPumpStatusOff(int pumpNumber)
 {
-	if (pumpNumber >= 0 && pumpNumber <= _DOMESTIC_WATER_PUMP) {
+	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP) {
 		_pumps[pumpNumber].running = false;
 		saveHistory(_pumps[pumpNumber]);
 		_pumps[pumpNumber].actualTemp = 0;
@@ -43,11 +42,17 @@ void hConfigurator::setPumpStatusOff(int pumpNumber)
 bool hConfigurator::getPumpStatus(int pumpNumber)
 {
 	bool result = false;
-	for (int i = 0; i < _DOMESTIC_WATER_PUMP; i++) {
+	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP)
+	{
+		result = _pumps[pumpNumber].running;
+	}
+	/*
+	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; i++) {
 		if (_pumps[i].running && _pumps[i].pumpNumber==pumpNumber) {
 			result = true;
 		}
 	}
+	*/
 	return result;
 }
 
@@ -59,7 +64,7 @@ int hConfigurator::getPumpRunningMinuts(int pumpNumber)
 bool hConfigurator::heatPumpsRunning()
 {
 	bool result = false;
-	for (int i = 0; i < _DOMESTIC_WATER_PUMP; i++) {
+	for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; i++) {
 		if (_pumps[i].running) {
 			result = true;
 		}
@@ -82,12 +87,12 @@ int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
 	if (lastMinuts > 59) lastMinuts = 59;
 	if (lastMinuts < 0) lastMinuts = 0;
 	if (actualHour < 0 || actualHour>23) actualHour = 0;
-	int countedActualMinutes = actualHour * 60 + actualMinute;
+	int minutsFromMidnight = actualHour * 60 + actualMinute;
 	for (int i = 0; i < (sizeof(_pumpsHistory) / sizeof(pumpStatus)); i++) {
 		if (_pumpsHistory[i].pumpNumber == pumpNumber) {
 			int countedStartMinutes = _pumpsHistory[i].start_hour * 60 + _pumpsHistory[i].start_minute;
 			if (_pumpsHistory[i].start_day != actualDay)  countedStartMinutes = countedStartMinutes - 1440;
-			if (countedStartMinutes + lastMinuts >=countedActualMinutes ) {
+			if (countedStartMinutes + lastMinuts >=minutsFromMidnight ) {
 				//I found turn off
 				result++; 
 			}
@@ -99,7 +104,7 @@ int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
 
 void hConfigurator::tickMinutes()
 {
-	for (int i = 0; i <= _DOMESTIC_WATER_PUMP; i++) {
+	for (int i = 1; i <=_DOMESTIC_WATER_PUMP; i++) {
 		if (&_pumps[i] == nullptr) continue;
 		if (_pumps[i].running && _pumps[i].actualMinute != minute()) {
 			_pumps[i].minuts++;
@@ -112,10 +117,10 @@ int hConfigurator::getPercentage(int pumpNumber)
 {
 	int all = 0;
 	float result = 0;
-	// get only stats from heat pumps 0-3 numbes
-	if (pumpNumber >= 0 && pumpNumber< _DOMESTIC_WATER_PUMP) {
+	// get only stats from heat pumps 1-4 numbes
+	if (pumpNumber > 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO) {
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; i++) {
 			all += _pumps[i].minuts;
 		}
 		if (all > 0) {
@@ -141,7 +146,7 @@ bool hConfigurator::registerClient(thermoClientStat client)
 
 
 hConfigurator::hConfigurator(){
-	for (int i = 0; i < 5; i++) {
+	for (int i = 1; i  <=_DOMESTIC_WATER_PUMP; i++) {
 		_pumps[i].running = false;
 	}
 	for (int i = 0; i < (sizeof(_pumpsHistory)/sizeof(pumpStatus)); i++) {

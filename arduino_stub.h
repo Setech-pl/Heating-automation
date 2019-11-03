@@ -13,7 +13,8 @@ void delay(int amount);
 
 
 enum WIFI_MODES {
-	WIFI_AP_STA = 1
+	WIFI_AP_STA = 1,
+	WIFI_STA = 2
 };
 
 enum wifiStatus {
@@ -52,7 +53,7 @@ public:
 	int RSSI();
 	std::string SSID();
 	IPAdress localIP();
-	bool softAP(const char sid[14], const char pass[26]);
+	bool softAP(const char sid[14], const char pass[26], int channel, bool aut, int subchannel);
 	bool mode(WIFI_MODES changeMode);
 
 };
@@ -65,10 +66,7 @@ public:
 	uint32_t getEpochTime();
 };
 
-class cSerial {
-public:
-	void println(const char* msg);
-};
+
 
 void setTime(uint32_t vtime);
 

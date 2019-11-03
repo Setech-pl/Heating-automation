@@ -1,3 +1,4 @@
+#define _CPPWINa 1
 #define _CRT_SECURE_NO_WARNINGS
 #include "screen.h"
 #include "heating_config.h"
@@ -6,8 +7,7 @@
 #include  <string.h>
 #include "scheduler.h"
 
-#ifndef _CPPWIN
-#else
+#ifdef _CPPWIN
 #include "arduino_stub.h"
 #endif
 
@@ -34,9 +34,9 @@ void hScreen::printMainScreen(){
   strcpy(this->lines[2],_BLANK_LINE);  
   strcpy(this->lines[3],_BLANK_LINE);
   strcpy(this->lines[0],hr);
-  sprintf(hr, "%sP1: %03d%%  %sP2: %03d%%",_config->getPumpStatus(0) ?"+" : " ", _config->getPercentage(0), _config->getPumpStatus(1) ? "+" : " ",_config->getPercentage(1));
+  sprintf(hr, "%sP1: %03d%%  %sP2: %03d%%",_config->getPumpStatus(1) ?"+" : " ", _config->getPercentage(1), _config->getPumpStatus(2) ? "+" : " ",_config->getPercentage(2));
   strcpy(this->lines[1], hr);
-  sprintf(hr, "%sP3: %03d%%  %sP4: %03d%%", _config->getPumpStatus(2) ?"+" : " ", _config->getPercentage(2), _config->getPumpStatus(3) ? "+" : " ", _config->getPercentage(3));
+  sprintf(hr, "%sP3: %03d%%  %sP4: %03d%%", _config->getPumpStatus(3) ?"+" : " ", _config->getPercentage(3), _config->getPumpStatus(4) ? "+" : " ", _config->getPercentage(4));
   strcpy(this->lines[2], hr);
 
 };
@@ -75,7 +75,7 @@ hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
 };
 
 void hScreen::printSplashScreen(){
-  strcpy(this->lines[0],"Heating server v 0.2");
+  strcpy(this->lines[0],_SERVER_VERSION);
   strcpy(this->lines[1],"(c) 2018/19 Marceli ");
   strcpy(this->lines[2],_BLANK_LINE);
   strcpy(this->lines[3],_BLANK_LINE);  
@@ -164,7 +164,9 @@ void hScreen::renderScreen(){
 		if (checkLinesChanges(i) || _clearScreen) {
 			_lcd->setCursor(0, i);
 			_lcd->print(this->getLine(i));
-      Serial.println(this->getLine(i));
+#ifndef _CPPWIN
+			Serial.println(this->getLine(i));
+#endif // !_CPPWIN
 			strcpy(this->_lines[i], this->getLine(i));
 		}
     }

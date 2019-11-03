@@ -62,15 +62,20 @@ int main()
 	createDailyPlans();
 
 	while (1) {
-		
+	/*
 		for (int i = 0; i < 256; i++) {
-			heatPumpController->turnOnHeatPumpReq(random(0,3), 0, 5);
+			bool wynik = heatPumpController->turnOnHeatPumpReq(random(1,4), 11, 21);
 			dyro->executeTasks();
 		}
 		for (int i = 0; i < 256; i++) {
-		//eatPumpController->turnOffHeatPumpReq(random(0, 3));
+			bool wynik2 = heatPumpController->turnOffHeatPumpReq(random(1,4),21, 21);
 			dyro->executeTasks();
 		}
+		*/
+		bool wynik = heatPumpController->turnOnHeatPumpReq(1, 11, 21);
+		wynik = config->getPumpStatus(1);
+		bool wynik2 = heatPumpController->turnOffHeatPumpReq(1, 21, 21);
+		wynik = config->getPumpStatus(1);
 		config->tickMinutes();
 
 		heatPumpController->turnOnCircPumpReq();
