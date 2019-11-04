@@ -146,7 +146,8 @@ void UDPMessengerService::setTempFromMQTT(tClientCommand mqttCommand)
   broadcastIP[3] = 255;
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject &result = jsonBuffer.createObject();
-  result["cmd"] = "REMOTESET";
+  result["cmd"] = "MQTTSET";
+  result["ID"] = mqttCommand.ID;
   result["SERVERIP"] = hr;
   sprintf(hr, "%d", now());
   result["TIME"] = hr;

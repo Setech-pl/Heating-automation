@@ -71,7 +71,7 @@ public:
 	~hConfigurator();
 
 private:
-	pumpStatus _pumps[5];
+	pumpStatus _pumps[6];
 	pumpStatus _pumpsHistory[256];
 	//thermoClientStat _clients[4];
 	int _pumpsHistoryC = 0;

@@ -19,7 +19,8 @@ void hConfigurator::setPumpStatusOn(int pumpNumber, float actualTemp, float setT
 		_pumps[pumpNumber].start_day = weekday();
 		_pumps[pumpNumber].actualTemp = actualTemp;
 		_pumps[pumpNumber].setTemp = setTemp;
-		saveHistory(_pumps[pumpNumber]);
+		if (pumpNumber < _DOMESTIC_WATER_PUMP)
+			saveHistory(_pumps[pumpNumber]);
 	}
 }
 
@@ -28,7 +29,8 @@ void hConfigurator::setPumpStatusOff(int pumpNumber)
 	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP)
 	{
 		_pumps[pumpNumber].running = false;
-		saveHistory(_pumps[pumpNumber]);
+		if (pumpNumber < _DOMESTIC_WATER_PUMP)
+			saveHistory(_pumps[pumpNumber]);
 		_pumps[pumpNumber].actualTemp = 0;
 		_pumps[pumpNumber].minuts = 0;
 		_pumps[pumpNumber].setTemp = 0;
@@ -46,13 +48,6 @@ bool hConfigurator::getPumpStatus(int pumpNumber)
 	{
 		result = _pumps[pumpNumber].running;
 	}
-	/*
-	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; i++) {
-		if (_pumps[i].running && _pumps[i].pumpNumber==pumpNumber) {
-			result = true;
-		}
-	}
-	*/
 	return result;
 }
 

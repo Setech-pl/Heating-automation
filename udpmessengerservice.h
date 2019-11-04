@@ -15,7 +15,8 @@
 "serial":"123456",
 "versionC":"1.1",
 "actualTEMP":"36.6",
-"targetTEMP":"38.6"
+"targetTEMP":"38.6",
+"actualHumidity":"90"
 }
 
 

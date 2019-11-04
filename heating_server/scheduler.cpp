@@ -266,6 +266,15 @@ hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,
 	this->_callbackFunction = callbackFunction;
 }
 
+hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator * _config)
+{
+	this->disposable = disposable;
+	this->scheduleTime = scheduleTime;
+	this->scheduleType = scheduleType;
+	this->payload = payload;
+	this->_config = _config;
+}
+
 bool hPumpCommand::execute()
 {
 	// turn on selected pump turnOnPump(payload);
@@ -409,43 +418,20 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 	return canTurnOff;
 }
 
-void hPumpsController::turnOnDomesticWaterPumpReq()
+void hPumpsController::turnOnDomesticWaterPumpReq(tm tTime)
 {
-	//enables circulation pump and turn on _DOMESTIC_WATER_PUMP_RUN_MINUTS  minutes
-	//functions will be call from MQTT incoming requests
-	_config->manualCirculationEnabled = true;
-	int taskId = 0;
-	tm tTime;
-	tTime.tm_hour = hour();
-	tTime.tm_min = minute();
-	tTime.tm_mday = day();
-	tTime.tm_wday = weekday();
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, hourly, _DOMESTIC_WATER_PUMP));
-	tTime.tm_min = minute() + _DOMESTIC_WATER_PUMP_RUN_MINUTS;
-	if ((tTime.tm_min + _DOMESTIC_WATER_PUMP_RUN_MINUTS) > 59)
-	{
-		tTime.tm_min = tTime.tm_min + _DOMESTIC_WATER_PUMP_RUN_MINUTS - 59;
-		tTime.tm_hour++;
-		if (tTime.tm_hour > 23)
-			tTime.tm_hour = 0;
-	}
 
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, hourly, _DOMESTIC_WATER_PUMP_OFF));
-	_config->setPumpStatusOn( _DOMESTIC_WATER_PUMP,45,45);
+	//functions will be call from MQTT incoming requests
+	int taskId = 0;
+	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, hourly, _DOMESTIC_WATER_PUMP,_config));
 	sanityCheck();
 }
 
-void hPumpsController::turnOffDomesticWaterPumpReq()
+void hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
 {
 	_config->manualCirculationEnabled = false;
 	int taskId = 0;
-	tm tTime;
-	tTime.tm_hour = hour();
-	tTime.tm_min = minute();
-	tTime.tm_mday = day();
-	tTime.tm_wday = weekday();
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF));
-	_config->setPumpStatusOff(_DOMESTIC_WATER_PUMP);
+	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF, _config));
 	sanityCheck();
 }
 
@@ -470,4 +456,15 @@ bool hCallbackCommand::execute()
 	}
 	else
 		return false;
+}
+
+bool hDomesticWaterPumpCommand::execute()
+{	
+	if (payload == _DOMESTIC_WATER_PUMP) {
+		_config->setPumpStatusOn(_DOMESTIC_WATER_PUMP,45,45);
+	}
+	else {
+		_config->setPumpStatusOff(_DOMESTIC_WATER_PUMP);
+	}
+	return true;
 }

@@ -51,49 +51,46 @@ void createPlanForDomesticWaterPump()
   //create normal daily plan for  domestic hot water circulation pump
   scht.tm_hour = 5;
   scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, (int)_DOMESTIC_WATER_PUMP));
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
   scht.tm_hour = 5;
   scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, (int)_DOMESTIC_WATER_PUMP_OFF));
-  /*
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
   scht.tm_hour = 6;
   scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
   scht.tm_hour = 6;
-  scht.tm_min = 40;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-
-  scht.tm_hour = 14;
-  scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-  scht.tm_hour = 14;
   scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
+  scht.tm_hour = 7;
+  scht.tm_min = 0;
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
+  scht.tm_hour = 7;
+  scht.tm_min = 30;
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
+  scht.tm_hour = 12;
+  scht.tm_min = 0;
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
+  scht.tm_hour = 12;
+  scht.tm_min = 30;
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
   scht.tm_hour = 16;
   scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
   scht.tm_hour = 16;
   scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-  scht.tm_hour = 18;
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
+  scht.tm_hour = 19;
   scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-  scht.tm_hour = 18;
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
+  scht.tm_hour = 19;
   scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-  scht.tm_hour = 20;
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
+  scht.tm_hour = 21;
   scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-  scht.tm_hour = 20;
+  heatPumpController->turnOnDomesticWaterPumpReq(scht);
+  scht.tm_hour = 21;
   scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-  scht.tm_hour = 22;
-  scht.tm_min = 0;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-  scht.tm_hour = 22;
-  scht.tm_min = 30;
-  scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-  */
+  heatPumpController->turnOffDomesticWaterPumpReq(scht);
 }
 
 void setup()

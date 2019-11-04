@@ -1,89 +1,100 @@
-
 #pragma once
 #include <time.h>
 #include "heating_config.h"
 
-enum escheduleType {
+enum escheduleType
+{
 	daily = 0,
 	hourly = 1,
 	minutly = 2,
-	weekly  = 3,
+	weekly = 3,
 	monthly = 4
 };
 
-class hCommand {
+class hCommand
+{
 public:
-	virtual bool  execute() = 0;
-	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,int payload );
-	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)() );
-
+	virtual bool execute() = 0;
+	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload);
+	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)());
+	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config);
 	bool disposable;
 	tm scheduleTime;
 	escheduleType scheduleType;
 	int payload;
-	char result[21]; 
+	char result[21];
+
 protected:
 	void (*_callbackFunction)();
-	hCommand* pumpsController;
-
+	hCommand *pumpsController;
+	hConfigurator *_config;
 };
 
-class hCallbackCommand : public hCommand {
+class hCallbackCommand : public hCommand
+{
 public:
 	bool execute();
-	hCallbackCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void(*callbackFunction)()) : hCommand( disposable, scheduleTime, scheduleType, callbackFunction) {};
+	hCallbackCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)()) : hCommand(disposable, scheduleTime, scheduleType, callbackFunction){};
 };
 
-class hScheduler {
+
+class hDomesticWaterPumpCommand : public hCommand
+{
 public:
-	int addTask(hCommand* polecenie); //return integer id of added task
-	int addExecuteTask(hCommand* polecenie);
+	bool execute();
+	hDomesticWaterPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config) : hCommand(disposable, scheduleTime, scheduleType, payload, _config) {};
+
+};
+
+
+
+class hScheduler
+{
+public:
+	int addTask(hCommand *polecenie); //return integer id of added task
+	int addExecuteTask(hCommand *polecenie);
 	void removeAllCommands();
-	void executeTasks(int commandId=0);
+	void executeTasks(int commandId = 0);
 	void removeCommand(int cNumber);
 	void removeCommands(int payload);
-	hCommand* getTask(int taskNumber);
+	hCommand *getTask(int taskNumber);
 	int maxTaskCount();
 	int activeTaskCount();
 	hScheduler();
 	~hScheduler();
 
-
 private:
 	const unsigned int commandCounter = 512;
-	hCommand* commands[512];
+	hCommand *commands[512];
 	int getFreeSlot();
 	bool checkSchedule(int cNumber);
-	bool findDuplicate(hCommand* polecenie);
-
-
+	bool findDuplicate(hCommand *polecenie);
 };
-
-
 
 /*
 	heating related commands
 */
 
-class hPumpCommand : public hCommand {
+class hPumpCommand : public hCommand
+{
 public:
 	bool execute();
-	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
+	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload){};
 };
 
-class hPumpsController {
+class hPumpsController
+{
 public:
 	hPumpsController(hScheduler *scheduler, hConfigurator *config);
-	void createDailyPlan(bool holiday );
+	void createDailyPlan(bool holiday);
 	void removeDailyPlan(int pumpNumber); //removes plan for pump number /1-5/
 	bool turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
 	bool turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
-	void turnOnCircPumpReq();
-	void turnOffCircPumpReq();
+	void turnOnDomesticWaterPumpReq(tm tTime);
+	void turnOffDomesticWaterPumpReq(tm tTime);
 	void sanityCheck();
+
 private:
-	hScheduler* _scheduler;
-	hConfigurator* _config;
-
-
+	hScheduler *_scheduler;
+	hConfigurator *_config;
 };

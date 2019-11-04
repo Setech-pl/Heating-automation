@@ -51,6 +51,7 @@ int main()
 	//Arduino global variables
 
 	tm time;
+	time.tm_sec = 0;
 	time.tm_hour = hour();
 	time.tm_min = minute();
 	time.tm_wday = weekday();
@@ -60,8 +61,9 @@ int main()
 	dyro->addTask(tt);
 	dyro->addTask(new enable_internal_wifi(true, time, minutly, 0));
 	createDailyPlans();
-
-	while (1) {
+	int i = 0;
+	while (i<100) {
+		i++;
 	/*
 		for (int i = 0; i < 256; i++) {
 			bool wynik = heatPumpController->turnOnHeatPumpReq(random(1,4), 11, 21);
@@ -74,13 +76,19 @@ int main()
 		*/
 		bool wynik = heatPumpController->turnOnHeatPumpReq(1, 11, 21);
 		wynik = config->getPumpStatus(1);
+
 		bool wynik2 = heatPumpController->turnOffHeatPumpReq(1, 21, 21);
 		wynik = config->getPumpStatus(1);
 		config->tickMinutes();
 
-		heatPumpController->turnOnCircPumpReq();
+		heatPumpController->turnOnDomesticWaterPumpReq(time);
 		dyro->executeTasks();
-		heatPumpController->turnOffCircPumpReq();
+		time.tm_min++;
+		heatPumpController->turnOffDomesticWaterPumpReq(time);
+		dyro->executeTasks();
+		config->tickMinutes();
+	}
+	while (1) {
 		dyro->executeTasks();
 		config->tickMinutes();
 	}

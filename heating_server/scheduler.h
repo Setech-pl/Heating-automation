@@ -1,4 +1,3 @@
-
 #pragma once
 #include <time.h>
 #include "heating_config.h"
@@ -18,7 +17,7 @@ public:
 	virtual bool execute() = 0;
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload);
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)());
-
+	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config);
 	bool disposable;
 	tm scheduleTime;
 	escheduleType scheduleType;
@@ -28,6 +27,7 @@ public:
 protected:
 	void (*_callbackFunction)();
 	hCommand *pumpsController;
+	hConfigurator *_config;
 };
 
 class hCallbackCommand : public hCommand
@@ -36,6 +36,17 @@ public:
 	bool execute();
 	hCallbackCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)()) : hCommand(disposable, scheduleTime, scheduleType, callbackFunction){};
 };
+
+
+class hDomesticWaterPumpCommand : public hCommand
+{
+public:
+	bool execute();
+	hDomesticWaterPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config) : hCommand(disposable, scheduleTime, scheduleType, payload, _config) {};
+
+};
+
+
 
 class hScheduler
 {
@@ -79,8 +90,8 @@ public:
 	void removeDailyPlan(int pumpNumber); //removes plan for pump number /1-5/
 	bool turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
 	bool turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
-	void turnOnDomesticWaterPumpReq();
-	void turnOffDomesticWaterPumpReq();
+	void turnOnDomesticWaterPumpReq(tm tTime);
+	void turnOffDomesticWaterPumpReq(tm tTime);
 	void sanityCheck();
 
 private:

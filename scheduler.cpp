@@ -1,4 +1,4 @@
-#define _CPPWIN 
+#define _CPPWIN 1
 #include "scheduler.h"
 #include <time.h>
 #include "utils.h"
@@ -266,13 +266,22 @@ hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,
 	this->_callbackFunction = callbackFunction;
 }
 
+hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator * _config)
+{
+	this->disposable = disposable;
+	this->scheduleTime = scheduleTime;
+	this->scheduleType = scheduleType;
+	this->payload = payload;
+	this->_config = _config;
+}
+
 bool hPumpCommand::execute()
 {
 	// turn on selected pump turnOnPump(payload);
-#ifndef  _CPPWIN
+#ifndef _CPPWIN
 	Serial.println("executing task, for payload= ");
 	Serial.print(this->payload);
-#endif // 
+#endif //
 	return true;
 }
 
@@ -293,50 +302,6 @@ void hPumpsController::createDailyPlan(bool holiday) //daily plan factory
 
 	if (!holiday)
 	{
-		//create normal daily plan for  domestic hot water circulation pump
-		scht.tm_hour = 5;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 5;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-		scht.tm_hour = 6;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 6;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-
-		scht.tm_hour = 14;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 14;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-		scht.tm_hour = 16;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 16;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-		scht.tm_hour = 18;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 18;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-		scht.tm_hour = 20;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 20;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
-		scht.tm_hour = 22;
-		scht.tm_min = 0;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP));
-		scht.tm_hour = 22;
-		scht.tm_min = 30;
-		_scheduler->addTask(new hPumpCommand(false, scht, daily, _DOMESTIC_WATER_PUMP_OFF));
 	}
 }
 
@@ -403,10 +368,12 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 
 	//negative validations
 	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO)
+	{
+#ifndef _CPPWIN
+		Serial.println("no because of invalid pump number");
+#endif // !_CPPWIN
 		canTurnOff = false;
-	//if (actualTemp <= setTemp + _MAX_HEATING_TEMP_DELTA + tempModifier) canTurnOff = false;
-	//if (actualTemp > _MAX_HEATING_INTERIOR_TEMP + tempModifier) canTurnOff = false;
-
+	}
 	//check last _MIN_PUMP_ONOFF_CYCLE minut history  for switch on - off
 	if (_config->lastOnOffPump(pumpNumber, _MIN_MINUTS_FROM_LAST_START) > 0 || _DISABLE_MAX_ONOFF_VALIDATION)
 	{
@@ -414,7 +381,6 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 #ifndef _CPPWIN
 		Serial.println("no because of _MIN_PUMP_ONOFF_CYCLE");
 #endif // !_CPPWIN
-		
 	}
 	//cannot turn off not running pump
 	if (!_config->getPumpStatus(pumpNumber))
@@ -428,10 +394,9 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 	if (canTurnOff)
 	{
 #ifndef _CPPWIN
-		Serial.println(" canTurnOff ");
+		Serial.println(" I can Turn Off ");
 		Serial.print(pumpNumber);
 #endif // !_CPPWIN
-
 
 		//doing off pump action
 		tm tTime;
@@ -444,38 +409,29 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 		_config->setPumpStatusOff(pumpNumber);
 		sanityCheck();
 	}
+	else
+	{
+#ifndef _CPPWIN
+		Serial.println("CANT turn off");
+#endif // !_CPPWIN
+	}
 	return canTurnOff;
 }
 
-void hPumpsController::turnOnCircPumpReq()
+void hPumpsController::turnOnDomesticWaterPumpReq(tm tTime)
 {
-	//enables circulation pump and turn on 5  minutes
-	_config->manualCirculationEnabled = true;
+
+	//functions will be call from MQTT incoming requests
 	int taskId = 0;
-	tm tTime;
-	tTime.tm_hour = hour();
-	tTime.tm_min = minute();
-	tTime.tm_mday = day();
-	tTime.tm_wday = weekday();
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, hourly, _DOMESTIC_WATER_PUMP));
-	tTime.tm_min = minute() + 5;
-	if ((tTime.tm_min + 5) > 59)
-		tTime.tm_min = tTime.tm_min - 60;
-	//tTime.tm_min = (minute()+5)>59 ? (minute()+5-59) : (minute()+5);
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, hourly, _DOMESTIC_WATER_PUMP_OFF));
+	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, hourly, _DOMESTIC_WATER_PUMP,_config));
 	sanityCheck();
 }
 
-void hPumpsController::turnOffCircPumpReq()
+void hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
 {
 	_config->manualCirculationEnabled = false;
 	int taskId = 0;
-	tm tTime;
-	tTime.tm_hour = hour();
-	tTime.tm_min = minute();
-	tTime.tm_mday = day();
-	tTime.tm_wday = weekday();
-	taskId = _scheduler->addTask(new hPumpCommand(true, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF));
+	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF, _config));
 	sanityCheck();
 }
 
@@ -500,4 +456,15 @@ bool hCallbackCommand::execute()
 	}
 	else
 		return false;
+}
+
+bool hDomesticWaterPumpCommand::execute()
+{	
+	if (payload == _DOMESTIC_WATER_PUMP) {
+		_config->setPumpStatusOn(_DOMESTIC_WATER_PUMP,45,45);
+	}
+	else {
+		_config->setPumpStatusOff(_DOMESTIC_WATER_PUMP);
+	}
+	return true;
 }
