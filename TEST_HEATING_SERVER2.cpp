@@ -64,16 +64,16 @@ int main()
 	int i = 0;
 	while (i<100) {
 		i++;
-	/*
-		for (int i = 0; i < 256; i++) {
+	
+		for (int i = 0; i < 24; i++) {
 			bool wynik = heatPumpController->turnOnHeatPumpReq(random(1,4), 11, 21);
 			dyro->executeTasks();
 		}
-		for (int i = 0; i < 256; i++) {
+		for (int i = 0; i < 24; i++) {
 			bool wynik2 = heatPumpController->turnOffHeatPumpReq(random(1,4),21, 21);
 			dyro->executeTasks();
 		}
-		*/
+		
 		bool wynik = heatPumpController->turnOnHeatPumpReq(1, 11, 21);
 		wynik = config->getPumpStatus(1);
 
@@ -91,6 +91,7 @@ int main()
 	while (1) {
 		dyro->executeTasks();
 		config->tickMinutes();
+		bool wynik = config->getPumpStatus(_DOMESTIC_WATER_PUMP);
 	}
 	LiquidCrystal_I2C* lcd = new LiquidCrystal_I2C();
 	hScreen* e = new hScreen(lcd, config);

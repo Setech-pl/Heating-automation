@@ -48,7 +48,7 @@ int hScheduler::addExecuteTask(hCommand *polecenie)
 	int commandId = 0;
 	commandId = addTask(polecenie);
 	executeTasks(commandId);
-	return 1;
+	return commandId;
 }
 
 void hScheduler::removeAllCommands()

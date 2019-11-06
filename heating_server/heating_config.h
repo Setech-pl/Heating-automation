@@ -4,9 +4,16 @@
 #define _EXTERNAL_WIFI_PASS ""
 #define _INTERNAL_WIFI_SID ""
 #define _INTERNAL_WIFI_PASS ""
+#define _MQTT_SERVER "192.168.1.5"
+#define _MQTT_SERVER_PORT 1883
+#define _MQTT_LOGIN ""
+#define _MQTT_PASSWORD ""
 #include "secrets.h"
 
-#define _SERVER_VERSION "Heating server (0.2.1)"
+#define _MQTT_SERVER_LOG_TOPIC "HAlog"
+#define _MQTT_SERVER_IN_COMMANDS_TOPIC "HAincommands"
+#define _MQTT_SERVER_OUT_COMMANDS_TOPIC "HAoutcommands"
+#define _SERVER_VERSION "Heating server (0.2.2)"
 const bool _INTERNAL_WIFI_MODE = false;
 
 //heating & domestic pumps management
@@ -22,7 +29,7 @@ const bool _INTERNAL_WIFI_MODE = false;
 #define _MAX_NIGHT_COOLING -2
 #define _MAX_HEATING_PUMP_RUNNING_MINUTES 7720
 const int _PRIORITY_ARRAY[_MAX_HEATING_PUMPS_NO] = {2, 2, 1, 0}; //Priority array,
-#define _DOMESTIC_WATER_PUMP 5								 //1,2,3,4 heating pumps, 5 water pump
+#define _DOMESTIC_WATER_PUMP 5									 //1,2,3,4 heating pumps, 5 water pump
 #define _DOMESTIC_WATER_PUMP_OFF 15
 #define _DOMESTIC_WATER_PUMP_RUN_MINUTS 15
 
@@ -60,12 +67,14 @@ public:
 	bool getPumpStatus(int pumpNumber);		  //return pump status true - is running false isn't running
 	int getPumpRunningMinuts(int pumpNumber); //return number of minuts running for pumpNumber;
 	bool heatPumpsRunning();
-	bool circulationPumpsRunning();
+	bool domesticWaterPumpIsRunning();
 	int lastOnOffPump(int pumpNumber, int lastMinuts); //count on-off cycles history for pumpNumber
 	void tickMinutes();								   // tick and add minuts to running pumps
 	bool holidayPlan = false;
 	bool manualCirculationEnabled = false;
 	bool registerClient(thermoClientStat client);
+	void setMQTTStatus(bool mqttStatus);
+	bool getMQTTStatus();
 	hConfigurator();
 	int getPercentage(int pumpNumber);
 	~hConfigurator();
@@ -73,6 +82,7 @@ public:
 private:
 	pumpStatus _pumps[6];
 	pumpStatus _pumpsHistory[256];
+	bool mqttStatus = false;
 	//thermoClientStat _clients[4];
 	int _pumpsHistoryC = 0;
 	void saveHistory(pumpStatus oldStatus);

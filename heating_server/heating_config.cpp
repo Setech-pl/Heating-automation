@@ -41,6 +41,16 @@ void hConfigurator::setPumpStatusOff(int pumpNumber)
 	}
 }
 
+bool hConfigurator::getMQTTStatus()
+{
+	return this->mqttStatus;
+}
+
+void hConfigurator::setMQTTStatus(bool mqttStatus)
+{
+	this->mqttStatus = mqttStatus;
+}
+
 bool hConfigurator::getPumpStatus(int pumpNumber)
 {
 	bool result = false;
@@ -69,7 +79,7 @@ bool hConfigurator::heatPumpsRunning()
 	return result;
 };
 
-bool hConfigurator::circulationPumpsRunning()
+bool hConfigurator::domesticWaterPumpIsRunning()
 {
 	return _pumps[_DOMESTIC_WATER_PUMP].running;
 };

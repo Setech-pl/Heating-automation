@@ -11,8 +11,6 @@
 #include "arduino_stub.h"
 #endif
 
-
-
 #include <Time.h>
 #ifndef _CPPWIN
 #include <TimeLib.h>
@@ -28,7 +26,7 @@ void hScreen::printStatusBar(const char Msg[]){
 
 void hScreen::printMainScreen(){
   char hr[21];
-  sprintf(hr," H(%s)   %02d:%02d   C(%s)", _config->heatPumpsRunning() ? "*" : "-",  hour(), minute(), _config->circulationPumpsRunning() ? "*" : "-");
+  sprintf(hr," H(%s)   %02d:%02d   C(%s)", _config->heatPumpsRunning() ? "*" : "-",  hour(), minute(), _config->domesticWaterPumpIsRunning() ? "*" : "-");
   strcpy(this->lines[0],_BLANK_LINE);    
   strcpy(this->lines[1],_BLANK_LINE);    
   strcpy(this->lines[2],_BLANK_LINE);  

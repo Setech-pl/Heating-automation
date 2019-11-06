@@ -32,6 +32,7 @@ struct tClientCommand
   float actualHum;
   char serialID[32];
   char versionC[12];
+  bool isRunning = false;
 };
 
 class UDPMessengerService

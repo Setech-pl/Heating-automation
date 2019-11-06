@@ -1,4 +1,3 @@
-
 #include <LiquidCrystal_I2C.h>
 #include "heating_config.h"
 #include <TimeLib.h>
@@ -6,11 +5,14 @@
 #include <Wire.h>
 #include "scheduler.h"
 #include <ESP8266WiFi.h>
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "screen.h"
 #include <ArduinoJson.h>
 #include "UDPMessengerService.h"
+#include "createDailyPlan.h"
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
@@ -19,6 +21,11 @@ hConfigurator *config = new hConfigurator();
 hPumpsController *heatPumpController = new hPumpsController(scheduler, config);
 hScreen *hdisplay = new hScreen(&lcd, config);
 UDPMessengerService udpMessenger(3636);
+WiFiClient client;
+// Enabling MQTT client support
+Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
+Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
+Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
 unsigned long timeMillis = 0;
 bool internalWIFIMode = false;
 
@@ -45,59 +52,10 @@ void hook_restart()
 Special setup functions
 */
 
-void createPlanForDomesticWaterPump()
-{
-  tm scht;
-  //create normal daily plan for  domestic hot water circulation pump
-  scht.tm_hour = 5;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 5;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 6;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 6;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 7;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 7;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 12;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 12;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 16;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 16;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 19;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 19;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-  scht.tm_hour = 21;
-  scht.tm_min = 0;
-  heatPumpController->turnOnDomesticWaterPumpReq(scht);
-  scht.tm_hour = 21;
-  scht.tm_min = 30;
-  heatPumpController->turnOffDomesticWaterPumpReq(scht);
-}
-
 void setup()
 {
   Serial.begin(115200);
   Serial.println("Entering setup mode");
-  delay(300);
   int counter = 0;
   bool wynik = false;
   char temp[21];
@@ -189,8 +147,32 @@ void setup()
   t.tm_mday = day();
   t.tm_wday = weekday();
   scheduler->addTask(new ntp_update(false, t, daily, 0));
+
+  // Enabling MQTT client support
+  Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
 }
 
+void hook_mqtt_reconnect()
+{
+  if (mqtt.connected())
+    config->setMQTTStatus(true);
+  else
+  {
+    int i = 0;
+    int8_t ret;
+    while (i < 5)
+    {
+      i++;
+      if (ret = mqtt.connect() != 0)
+      {
+        mqtt.disconnect();
+        Serial.println(mqtt.connectErrorString(ret));
+        delay(10);
+      }
+    }
+    return mqtt.connected();
+  }
+}
 void loop()
 {
 
@@ -249,6 +231,7 @@ void loop()
   }
 
   // MQTT client section
+  mqtt.processPackets(10000);
   if (false)
   {
     //incoming external command - set temp to Thermo Client ID
