@@ -24,8 +24,6 @@ UDPMessengerService udpMessenger(3636);
 WiFiClient client;
 // Enabling MQTT client support
 Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
-Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
-Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
 unsigned long timeMillis = 0;
 bool internalWIFIMode = false;
 
