@@ -23,8 +23,9 @@ hScreen *hdisplay = new hScreen(&lcd, config);
 UDPMessengerService udpMessenger(3636);
 WiFiClient client;
 // Enabling MQTT client support
-Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
-Adafruit_MQTT_Subscribe incommingCommands(&mqtt, "heating/commands");
+const char clientid[] PROGMEM = "HeatingSrv";
+Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, clientid); //, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
+Adafruit_MQTT_Subscribe incommingCommands(&mqtt, "/heating/commands");
 unsigned long timeMillis = 0;
 bool internalWIFIMode = false;
 
@@ -148,17 +149,22 @@ void setup()
   scheduler->addTask(new ntp_update(false, t, daily, 0));
 
   // Enabling MQTT client support
+
   Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
   hook_mqtt_reconnect();
   t.tm_hour = hour();
-  scheduler->addTask(new hCallbackCommand(false, t, hourly, &hook_mqtt_reconnect));
+  scheduler->addTask(new hCallbackCommand(false, t, minutly, &hook_mqtt_reconnect));
   mqtt.subscribe(&incommingCommands);
 }
 
 void hook_mqtt_reconnect()
+
 {
   if (mqtt.connected())
+  {
     config->setMQTTStatus(true);
+    Serial.println("Checking mqtt status : connected");
+  }
   else
   {
     int i = 0;
@@ -169,9 +175,12 @@ void hook_mqtt_reconnect()
       if (ret = mqtt.connect() != 0)
       {
         mqtt.disconnect();
+        Serial.println("mqtt dummy error on connect");
         Serial.println(mqtt.connectErrorString(ret));
-        delay(10);
+        delay(150);
       }
+      else
+        Serial.println("MQTT reconnected");
     }
   }
 }
@@ -233,10 +242,10 @@ void loop()
   }
 
   // MQTT client section
-  //mqtt.processPackets(10000);
+
   Adafruit_MQTT_Subscribe *subscription;
   bool gotMQTTCommand = false;
-  while ((subscription = mqtt.readSubscription(5000)))
+  while ((subscription = mqtt.readSubscription(8192)))
   {
     if (subscription == &incommingCommands)
     {
@@ -248,5 +257,6 @@ void loop()
   if (gotMQTTCommand)
   {
     //incoming external command - set temp to Thermo Client ID
+    Serial.println('i got mqtt command');
   }
 }
