@@ -4,15 +4,12 @@
 #define _EXTERNAL_WIFI_PASS ""
 #define _INTERNAL_WIFI_SID ""
 #define _INTERNAL_WIFI_PASS ""
-#define _MQTT_SERVER "192.168.1.5"
+#define _MQTT_SERVER "192.168.43.3"
 #define _MQTT_SERVER_PORT 1883
 #define _MQTT_LOGIN ""
 #define _MQTT_PASSWORD ""
 #include "secrets.h"
 
-#define _MQTT_SERVER_LOG_TOPIC "HAlog"
-#define _MQTT_SERVER_IN_COMMANDS_TOPIC "HAincommands"
-#define _MQTT_SERVER_OUT_COMMANDS_TOPIC "HAoutcommands"
 #define _SERVER_VERSION "Heating server (0.2.2)"
 const bool _INTERNAL_WIFI_MODE = false;
 
