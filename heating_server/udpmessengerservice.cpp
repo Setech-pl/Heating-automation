@@ -45,6 +45,8 @@ void UDPMessengerService::sendPacket(IPAddress ip, bool broadcast, uint16_t port
   }
   _udp.write(content);
   _udp.endPacket();
+  Serial.println("Sending packet");
+  Serial.println(content);
 }
 
 void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort, char *message)

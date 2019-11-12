@@ -4,13 +4,17 @@
 #define _EXTERNAL_WIFI_PASS ""
 #define _INTERNAL_WIFI_SID ""
 #define _INTERNAL_WIFI_PASS ""
-#define _MQTT_SERVER "192.168.43.3"
+#define _MQTT_SERVER "192.168.1.8"
 #define _MQTT_SERVER_PORT 1883
 #define _MQTT_LOGIN ""
 #define _MQTT_PASSWORD ""
+#define _MQTT_CLIENT_ID "HEATING_SRV"
+#define _MQTT_COMMANDS_TOPIC "heating/commands"
+#define _MQTT_LOGS_TOPIC "heating/logs"
+#define _MQTT_SENSORS_TOPIC "heating/sensors"
 #include "secrets.h"
 
-#define _SERVER_VERSION "Heating server (0.2.2)"
+#define _SERVER_VERSION "Heating server 0.2.3 "
 const bool _INTERNAL_WIFI_MODE = false;
 
 //heating & domestic pumps management

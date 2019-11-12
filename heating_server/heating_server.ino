@@ -5,8 +5,7 @@
 #include <Wire.h>
 #include "scheduler.h"
 #include <ESP8266WiFi.h>
-#include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT_Client.h"
+#include <PubSubClient.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "screen.h"
@@ -21,11 +20,12 @@ hConfigurator *config = new hConfigurator();
 hPumpsController *heatPumpController = new hPumpsController(scheduler, config);
 hScreen *hdisplay = new hScreen(&lcd, config);
 UDPMessengerService udpMessenger(3636);
-WiFiClient client;
 // Enabling MQTT client support
-const char clientid[] PROGMEM = "HeatingSrv";
-Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, clientid); //, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
-Adafruit_MQTT_Subscribe incommingCommands(&mqtt, "/heating/commands");
+const char clientid[] = "HeatingSrv";
+WiFiClient espClient;
+PubSubClient client(espClient);
+bool gotMQTTCommand = false;
+byte *MQTTCommand;
 unsigned long timeMillis = 0;
 bool internalWIFIMode = false;
 
@@ -46,6 +46,24 @@ void hook_sanity_check()
 void hook_restart()
 {
   ESP.restart();
+}
+
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+  Serial.println(topic);
+  if (strcmp(topic, _MQTT_COMMANDS_TOPIC) == 0)
+  {
+    gotMQTTCommand = true;
+  }
+  if (gotMQTTCommand)
+  {
+    Serial.println("got incomming command");
+    for (int i = 0; i < length; i++)
+    {
+      Serial.print((char)payload[i]);
+    }
+    Serial.println("end of command");
+  }
 }
 
 /*
@@ -97,7 +115,7 @@ void setup()
   counter = 0;
   wynik = false;
   //Updating time from NTP time server
-  while (!wynik && counter < 5)
+  while (!wynik && counter && !internalWIFIMode< 5)
   {
     ;
     sprintf(temp, "Updating NTP(%d)  ", counter);
@@ -150,17 +168,18 @@ void setup()
 
   // Enabling MQTT client support
 
-  Adafruit_MQTT_Client mqtt(&client, _MQTT_SERVER, _MQTT_SERVER_PORT, _MQTT_LOGIN, _MQTT_SERVER_PASSWORD);
+  client.setServer(_MQTT_SERVER, _MQTT_SERVER_PORT);
+  client.setCallback(mqttCallback);
   hook_mqtt_reconnect();
   t.tm_hour = hour();
+  t.tm_min = minute();
   scheduler->addTask(new hCallbackCommand(false, t, minutly, &hook_mqtt_reconnect));
-  mqtt.subscribe(&incommingCommands);
 }
 
 void hook_mqtt_reconnect()
 
 {
-  if (mqtt.connected())
+  if (client.connected())
   {
     config->setMQTTStatus(true);
     Serial.println("Checking mqtt status : connected");
@@ -168,22 +187,26 @@ void hook_mqtt_reconnect()
   else
   {
     int i = 0;
-    int8_t ret;
     while (i < 5)
     {
       i++;
-      if (ret = mqtt.connect() != 0)
+      if (client.connect(_MQTT_CLIENT_ID))
       {
-        mqtt.disconnect();
-        Serial.println("mqtt dummy error on connect");
-        Serial.println(mqtt.connectErrorString(ret));
-        delay(150);
+        Serial.println("connected to MQTT");
+        config->setMQTTStatus(true);
+        client.subscribe(_MQTT_COMMANDS_TOPIC);
+        break;
       }
       else
-        Serial.println("MQTT reconnected");
+      {
+        Serial.println("Error connecting to mqtt server");
+        config->setMQTTStatus(false);
+        delay(150);
+      }
     }
   }
 }
+
 void loop()
 {
 
@@ -213,6 +236,13 @@ void loop()
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
       udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
+      if (config->getMQTTStatus())
+      {
+        char subtopic[16];
+        sprintf(subtopic, "%s/%s%d", _MQTT_SENSORS_TOPIC, "thermostat", temp.ID);
+        Serial.println(subtopic);
+        // client.publish(#_MQTT_SENSORS_TOPIC "/" , hr);
+      }
     }
 
     if (strcmp(temp.cmd, "OFF") == 0)
@@ -242,21 +272,11 @@ void loop()
   }
 
   // MQTT client section
-
-  Adafruit_MQTT_Subscribe *subscription;
-  bool gotMQTTCommand = false;
-  while ((subscription = mqtt.readSubscription(8192)))
-  {
-    if (subscription == &incommingCommands)
-    {
-      Serial.print(F("Got: "));
-      Serial.println((char *)incommingCommands.lastread);
-      gotMQTTCommand = true;
-    }
-  }
+  client.loop();
   if (gotMQTTCommand)
   {
     //incoming external command - set temp to Thermo Client ID
-    Serial.println('i got mqtt command');
+    Serial.println('i got mqtt command in main loop');
+    gotMQTTCommand = false;
   }
 }

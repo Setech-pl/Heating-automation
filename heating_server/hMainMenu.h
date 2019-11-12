@@ -24,6 +24,3 @@ protected:
 		hMenuItem* menuItems[16];
 		int menuItemsCount;
 };
-
-
-
