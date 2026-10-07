@@ -6,7 +6,7 @@
 #include <WiFiUdp.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
-#include "scheduler.h"
+#include <stddef.h>
 
 /* A message from Thermostat client
  {
@@ -41,15 +41,15 @@ protected:
   static const int _MAX_PACKET_SIZE = 512;
   uint16_t _listenPort;
   WiFiUDP _udp;
-  void processMessage(IPAddress senderIp, uint16_t senderPort, char *message);
+  void processMessage(IPAddress senderIp, uint16_t senderPort, char *message, size_t length);
   void sendPacket(IPAddress ip, bool broadcast, uint16_t port, const char *content);
   void getDeviceInfo(JsonObject &result);
 
 private:
   bool _commandFlag = false;
   IPAddress _lastSenderIp;
-  uint16_t _lastSenderPort;
-  tClientCommand _currentCommand;
+  uint16_t _lastSenderPort = 0;
+  tClientCommand _currentCommand = {};
 
 public:
   UDPMessengerService(uint16_t port);
