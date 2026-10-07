@@ -1,5 +1,12 @@
 secrets*
 secrets.h
+!**/secrets.example.h
+.arduino/
+build/
+*.bin
+*.elf
+*.map
+__pycache__/
 *.log
 Debug/
 .vs/

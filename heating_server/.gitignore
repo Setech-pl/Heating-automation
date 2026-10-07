@@ -1,5 +1,6 @@
 secrets*
 secrets.h
+!secrets.example.h
 *.log
 Debug/
 .vs/
