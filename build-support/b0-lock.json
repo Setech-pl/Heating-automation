@@ -1,8 +1,8 @@
 {
-  "status": "dependency sources verified; firmware build blocked on current macOS ARM64; not a validated hardware profile",
+  "status": "macOS ARM64 native build tools; dummy-only build profile, not validated hardware",
   "host": "macOS arm64",
   "cli_version": "1.3.1",
-  "core_version": "2.5.2",
+  "core_version": "3.1.2",
   "fqbn": "esp8266:esp8266:generic:xtal=80,vt=flash,exception=disabled,ssl=all,ResetMethod=ck,CrystalFreq=26,FlashFreq=40,FlashMode=dout,eesz=512K,led=2,sdk=nonosdk221,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200",
   "artifacts": [
     {
@@ -11,55 +11,6 @@
       "archive": "arduino-cli_1.3.1_macOS_ARM64.tar.gz",
       "sha256": "723f8ddaf4875e87a20380c88c15ff9d55916c3c80cb432f1f980ea32cec2341",
       "destination": "bin",
-      "strip": 0
-    },
-    {
-      "repo": "esp8266/Arduino",
-      "tag": "2.5.2",
-      "archive": "esp8266-2.5.2.zip",
-      "sha256": "be8dffa6e3836b4ea22acb64e52f730177c30e291289b2584ca45a6abeb700b2",
-      "destination": "data/packages/esp8266/hardware/esp8266/2.5.2",
-      "strip": 1
-    },
-    {
-      "repo": "esp8266/Arduino",
-      "tag": "2.5.2",
-      "archive": "package_esp8266com_index.json",
-      "sha256": "de187811a7d12fb60a992cec6855ca07dac103123dcf4c6b4b23dabbe426538a",
-      "destination": "data",
-      "strip": 0,
-      "file": true
-    },
-    {
-      "repo": "earlephilhower/esp-quick-toolchain",
-      "tag": "2.5.0-3",
-      "archive": "x86_64-apple-darwin14.xtensa-lx106-elf-20ed2b9c.tar.gz",
-      "sha256": "fd29ae844915fb2dd800d99ad7967be0e890601c18b80555efbc4eca2dd808c2",
-      "destination": "data/packages/esp8266/tools/xtensa-lx106-elf-gcc/2.5.0-3-20ed2b9",
-      "strip": 1
-    },
-    {
-      "repo": "earlephilhower/esp-quick-toolchain",
-      "tag": "2.5.0-3",
-      "archive": "x86_64-apple-darwin14.mkspiffs-7fefeac.tar.gz",
-      "sha256": "927cb67d045c598a9159ae16bc5fb63a20b3e23ad95eeb44702c938e6272f92f",
-      "destination": "data/packages/esp8266/tools/mkspiffs/2.5.0-3-20ed2b9",
-      "strip": 1
-    },
-    {
-      "repo": "earlephilhower/esp-quick-toolchain",
-      "tag": "2.5.0-3",
-      "archive": "python-placeholder.tar.gz",
-      "sha256": "3b32fdb0905abf97e923ff968b6a0da8ce85d632b27845d7e2fc759778778785",
-      "destination": "data/packages/esp8266/tools/python/3.7.2-post1",
-      "strip": 1
-    },
-    {
-      "repo": "arduino/ctags",
-      "tag": "5.8-arduino11",
-      "archive": "ctags-5.8-arduino11-x86_64-apple-darwin.zip",
-      "sha256": "b178c8ffca3cceeb4ffa6baad24cf21d2c1879348fac93c0b33f7b5365a20d6a",
-      "destination": "data/packages/builtin/tools/ctags/5.8-arduino11",
       "strip": 0
     },
     {
@@ -76,6 +27,39 @@
       "archive": "mdns-discovery_v1.0.9_macOS_ARM64.tar.gz",
       "sha256": "b13afa80c12e6faecc61e05901fce1649254997ed26d61e6c4a446b3a41c3b6d",
       "destination": "data/packages/builtin/tools/mdns-discovery/1.0.9",
+      "strip": 1
+    },
+    {
+      "repo": "esp8266/Arduino",
+      "tag": "3.1.2",
+      "archive": "esp8266-3.1.2.zip",
+      "sha256": "b3f47686d7783c120c2f10bf82788f921c53db8642cc87012599abb6e335b182",
+      "destination": "data/packages/esp8266/hardware/esp8266/3.1.2",
+      "strip": 1
+    },
+    {
+      "repo": "esp8266/Arduino",
+      "tag": "3.1.2",
+      "archive": "package_esp8266com_index.json",
+      "sha256": "08a34170646b8fd4d410d2feacdc79896c04c5f4a725fbd3561cf794e45b6deb",
+      "destination": "data",
+      "strip": 0,
+      "file": true
+    },
+    {
+      "repo": "esphome-libs/xtensa-lx106-elf-toolchain",
+      "tag": "10.3.0-esphome.2",
+      "archive": "toolchain-xtensa-lx106-elf-10.3.0-esphome.2-darwin_arm64.tar.gz",
+      "sha256": "849cede44d4d5c6ea0f14099783239f559f46327bea314281814f2652b486201",
+      "destination": "data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec",
+      "strip": 0
+    },
+    {
+      "repo": "arduino/ctags",
+      "tag": "5.8-arduino11",
+      "archive": "ctags-5.8-arduino11.tar.xz",
+      "sha256": "9591ce86efa2ff7c277561706e6ace376201c5ec5f0b3925c50884ebf365d7e7",
+      "destination": "sources/ctags",
       "strip": 1
     }
   ],
@@ -106,7 +90,13 @@
       "repo": "PaulStoffregen/Time",
       "tag": "v1.5",
       "version": "1.5",
-      "commit": "1574db45638636f2c1351fd264d6404f68780ee5"
+      "commit": "1574db45638636f2c1351fd264d6404f68780ee5",
+      "checkout": "sources/Time",
+      "omit_headers": ["Time.h"],
+      "include_replacements": {
+        "Time.cpp": ["#include \"Time.h\"", "#include \"TimeLib.h\""],
+        "DateStrings.cpp": ["#include \"Time.h\"", "#include \"TimeLib.h\""]
+      }
     }
   ],
   "vendored_lcd": {
@@ -119,5 +109,16 @@
       "library.json": "694c9c36da97fe26834bce502af98992bdf767648dbe6270435fce6b3caa949d",
       "keywords.txt": "084c3a5f717638e67682223511177012d14b213bb669ebff6944e46700d637c6"
     }
+  },
+  "toolchain_release": "10.3.0-esphome.2",
+  "ctags": {
+    "version": "5.8-arduino11",
+    "source": "sources/ctags",
+    "destination": "data/packages/builtin/tools/ctags/5.8-arduino11",
+    "cc": "/usr/bin/clang",
+    "cflags": "-O2 -std=gnu89 -Wno-implicit-function-declaration",
+    "configure": [
+      "--disable-external-sort"
+    ]
   }
 }

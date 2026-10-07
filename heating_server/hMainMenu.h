@@ -1,12 +1,11 @@
 #pragma once
-#pragma warning(disable : 4200)
 
 
 class hMenuItem {
 	hMenuItem(char *caption[18]);
 
 protected:
-	char* caption[];
+	char* caption[18];
 
 };
 

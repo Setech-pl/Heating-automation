@@ -11,7 +11,6 @@
 #include "arduino_stub.h"
 #endif
 
-#include <Time.h>
 #ifndef _CPPWIN
 #include <TimeLib.h>
 #endif

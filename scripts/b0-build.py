@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Compile the central controller using a staged dummy-only sketch."""
+import hashlib
 import json
 import os
 import shutil
@@ -15,6 +16,10 @@ def main():
     cli = LOCAL / "bin/arduino-cli"
     if not cli.is_file():
         raise SystemExit("Run python3 scripts/b0-prepare.py first.")
+    prepared = LOCAL / "prepared.json"
+    digest = hashlib.sha256((ROOT / "build-support/b0-lock.json").read_bytes()).hexdigest()
+    if not prepared.is_file() or json.loads(prepared.read_text())["lock_sha256"] != digest:
+        raise SystemExit("Build manifest changed/not prepared; run python3 scripts/b0-prepare.py.")
     work = ROOT / "build/b0"
     sketch = work / "sketch/heating_server"
     if sketch.exists():
@@ -43,7 +48,7 @@ def main():
     config = LOCAL / "b0-cli.yaml"
     config.write_text("board_manager:\n  additional_urls: []\n")
     command = [str(cli), "--config-file", str(config), "compile",
-               "--fqbn", LOCK["fqbn"], "--warnings", "all",
+               "--fqbn", LOCK["fqbn"], "--warnings", "all", "--clean",
                "--verbose", "--build-path", str(work / "compiled"),
                "--output-dir", str(work / "output"), str(sketch)]
     print("Compiling central controller with dummy configuration only.", flush=True)

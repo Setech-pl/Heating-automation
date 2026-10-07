@@ -4,7 +4,6 @@
 #include "arduino_stub.h"
 #endif
 #ifndef _CPPWIN
-#include <Time.h>
 #include <TimeLib.h>
 #endif
 

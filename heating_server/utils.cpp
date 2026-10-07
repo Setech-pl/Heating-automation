@@ -7,7 +7,6 @@
   #include <ESP8266WiFi.h>
   #include <NTPClient.h>
   #include <WiFiUdp.h>
-  #include <Time.h>
   #include <TimeLib.h>
 #else
   #include "arduino_stub.h"
