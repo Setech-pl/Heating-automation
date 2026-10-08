@@ -1,53 +1,106 @@
 # Heating Automation
 
+[Polski](README.pl.md) | English
+
 [![CI](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml)
 
-Centrala ESP8266 odbiera żądania termostatów przez UDP i steruje czterema
-pompami CO oraz pompą obiegową CWU. Kod centrali znajduje się w
-`heating_server/`. Źródła i build firmware termostatów nie zostały odnalezione;
-rootowe projekty Windows są osobnymi, historycznymi programami hostowymi.
+Heating Automation is an ESP8266 central controller for four space-heating
+circulation pumps (CO, IDs 1–4) and one domestic hot-water circulation pump
+(CWU, ID 5). Thermostats provide room temperature and heating requests over
+Wi-Fi/UDP. Controller firmware is in [heating_server/](heating_server/).
+This repository contains no identified thermostat firmware entry point or
+build recipe; its root-level Visual Studio projects are separate host programs.
+Thermostat hardware and sensors are not specified here.
 
-## Build na Macu
+The controller validates requests, applies temperature and switching limits,
+and writes configured relay outputs. It has an I2C LCD, NTP synchronization
+and an MQTT connection with subscription support. Incoming MQTT messages do
+not control pumps, and telemetry is not published.
 
-Wymagane: macOS ARM64, Python ≥3.9, Git, GitHub CLI `gh`, `make`, BSD tar
-oraz Clang z macOS SDK. Narzędzia i przypięte zależności instalują się lokalnie
-w ignorowanym `.arduino/`, bez zmiany globalnego toolchaina. Aktualny obraz
-budujemy ze źródeł przy użyciu skryptów i manifestu `build-support/b0-lock.json`:
+Controller 0.3.0 accepts HEARTBEAT and, after **>= 180 s** without a valid
+message from the assigned thermostat, switches OFF only its CO pump.
+Heartbeat never starts a pump; after timeout a new ON must satisfy normal
+gates. Pending old ON requests are invalidated. The contract requires a
+heartbeat every **60 s**, including without heating; thermostat transmission
+and reconnect cannot be established here because their sources are absent.
+See the [architecture, component diagrams and protocol](docs/ARCHITECTURE.md).
+
+## Build on macOS ARM64
+
+Requirements: macOS ARM64, Python ≥3.9, Git, GitHub CLI `gh`, `make`, BSD tar
+and Clang with the macOS SDK. Tools and pinned dependencies are installed
+locally in ignored `.arduino/`, without changing the global toolchain.
+Run from the repository root:
 
 ```sh
 python3 scripts/b0-prepare.py
 python3 scripts/b0-build.py
 ```
 
-Pierwsze przygotowanie wymaga dostępu do publicznych wydań GitHub. Kolejne
-buildy używają lokalnych zależności. Manifest i szczegóły wersji opisano w
-[build-support/README.md](build-support/README.md).
+Initial preparation needs access to public GitHub releases. Subsequent builds
+use local dependencies. Versions and adaptations are described in the
+[build guide](build-support/README.md) and [b0-lock.json](build-support/b0-lock.json).
 
-Domyślny build używa wyłącznie przykładowych sekretów i nieskonfigurowanych
-przekaźników. ELF/BIN trafiają do `build/b0/output/`, a log i rozmiary do
-`build/b0/compile.log`. Skrypt nie flashuje urządzenia. Profil generic ESP8266
-z flash 512 KB jest historycznym profilem kompilacji; trzeba porównać go
-z rzeczywistym modułem przed przygotowaniem obrazu dla płytki.
+The default build uses dummy credentials and unconfigured relays. ELF/BIN files
+go to `build/b0/output/`, and the log and memory sizes to `build/b0/compile.log`.
+The script does not upload firmware. The generic ESP8266 profile with 512 KB
+flash is a compilation profile, not confirmation of the physical board or flash.
 
-## CI
+## Configuration and startup
 
-[GitHub Actions](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml)
-uruchamia się na push, pull request i ręcznie przez `workflow_dispatch`.
-Jeden job na macOS 15 ARM64 przygotowuje przypięte zależności istniejącym
-skryptem, uruchamia wszystkie cztery targety hostowe normalnie i z ASan/UBSan
-oraz buduje centralę z przykładową konfiguracją. Podsumowanie wykonania zawiera
-wyniki targetów, zużycie RAM/IRAM/flash i rozmiar BIN; szczegółowy log kompilacji
-znajduje się w `build/b0/compile.log` na runnerze. CI ma tylko `contents: read`,
-a publiczne wydania pobiera przez standardowy token workflow przekazany jako
-`GH_TOKEN`. Oficjalne akcje są przypięte pełnymi SHA. Nie używa PAT ani sekretów
-właściciela i nie flashuje urządzenia.
+Create local configuration only if the files do not already exist:
 
-Stary eksport `heating_server.ino.generic.bin`, baza Visual Studio `.VC.db`
-i ustawienia użytkownika `.vcxproj.user` są wygenerowanymi artefaktami;
-nie są wejściami obecnego builda i pozostają ignorowane. Źródła, rozwiązania
-Windows `.sln`, projekty `.vcxproj` i ich filtry pozostają w repozytorium.
+```sh
+cp -n heating_server/secrets.example.h heating_server/secrets.h
+cp -n heating_server/relay_config.example.h heating_server/relay_config.h
+```
 
-## Testy
+Set your Wi-Fi, fallback AP and MQTT options using the names in
+`secrets.example.h`. Keep credentials in local `secrets.h`; both `secrets.h`
+and `relay_config.h` are ignored by Git. These local files are used only
+when explicitly selected:
+
+```sh
+python3 scripts/b0-build.py --local-config
+```
+
+`HEATING_RELAYS` contains five rows: CO pump IDs **1–4**, then CWU pump ID **5**.
+Each row is an **ESP8266 GPIO number** and an active level (`0` or `1`),
+not a Dx board label or pump ID. The example uses `{-1, -1}` for every channel.
+No physical pin mapping or relay polarity is confirmed by this repository.
+Match configuration to the actual board and wiring.
+
+`HEATING_THERMOSTAT_SERIALS` contains four chip serials for CO IDs 1–4.
+Entry 0 disables that ID; positive entries must be unique. Use the actual
+serials of the assigned thermostats. Add this array from the current example
+to an existing local file while preserving GPIO, polarity and other settings.
+Packets cannot change the assignment.
+
+The driver rejects duplicate GPIOs, unknown polarity, numbers outside 0–16,
+flash pins 6–11, Serial pins 1/3 and the default Wire pins used by the LCD
+(4/5 in this build profile). There is no relay expander implementation.
+Configured outputs initialize OFF, setting the latch before enabling OUTPUT.
+Unconfigured or unsuccessfully initialized channels reject switching.
+GPIO behavior before firmware startup, bootstrap circuitry, relay polarity
+and NO/NC contacts require physical verification. Software output status
+does not confirm relay contact position or pump operation.
+
+`HEATING_ENABLE_DOMESTIC_PLAN` defaults to `false`. Enabling it registers the
+CWU schedule: ON at 05:00, 06:00, 07:00, 12:00, 16:00, 19:00 and 21:00,
+with scheduled OFF 30 minutes later. The independent **15-minute** CWU runtime
+limit takes precedence. No holiday schedule is defined.
+
+At startup firmware initializes relay outputs and the LCD, attempts external
+Wi-Fi, and attempts to enable an AP if those startup attempts fail. It then
+attempts NTP synchronization in external Wi-Fi mode, starts UDP discovery and MQTT servicing,
+and enters `loop()`. The build scripts do not provide an installation-specific
+upload procedure. Loss of Wi-Fi during normal operation does not trigger the
+startup AP procedure; missing thermostat contact triggers separate CO timeouts
+after 180 s.
+
+## Verification
+
+After preparing dependencies, the available host checks are:
 
 ```sh
 python3 scripts/test-host-udp.py
@@ -60,89 +113,49 @@ python3 scripts/test-host-scheduler.py --sanitize
 python3 scripts/test-host-runtime.py --sanitize
 ```
 
-Testy kompilują produkcyjny kod centrali. Target runtime obejmuje również
-rzeczywiste `setup()` i `loop()`. Adaptery zapewniają kontrolowany zegar,
-GPIO, LCD i transport, bez urządzeń oraz rzeczywistych połączeń sieciowych.
-NTP, parser JSON i test timeoutu MQTT korzystają z przypiętych bibliotek. ASan/UBSan zatrzymują
-się po pierwszym błędzie; LSan na macOS jest wyłączony. Bilans destrukcji
-zadań jest sprawdzany osobno. Testy hostowe nie potwierdzają działania płytki.
+These targets compile production logic with deterministic clocks and fake GPIO,
+LCD and transports. Runtime also exercises the actual `setup()` and `loop()`.
+NTP, JSON parsing and the MQTT timeout check use pinned libraries. ASan/UBSan
+stop at the first error; LSan is disabled on macOS. Host tests do not establish
+physical GPIO behavior. Details: [UDP](tests/host-udp/README.md),
+[startup](tests/host-startup/README.md).
 
-## Konfiguracja
+For a separately authorized hardware check, compare Serial output (115200),
+LCD network/time status and UDP `SHOWSTATUS` responses with observed relay and
+pump operation. `RUNNING` is software state and `OUTPUT` is the last issued
+output state; neither is hardware feedback. A successful build or ACK does
+not establish physical operation of communication-loss shutdown.
 
-Jeżeli nie masz jeszcze własnych plików, skopiuj przykłady bez nadpisywania
-istniejącej konfiguracji:
+## Device update and compatibility
 
-```sh
-cp -n heating_server/secrets.example.h heating_server/secrets.h
-cp -n heating_server/relay_config.example.h heating_server/relay_config.h
-```
+Controller 0.3.0 requires local serial assignments and clients sending
+HEARTBEAT every 60 s plus `serial` in ON/OFF. An older client without that
+field cannot start CO; a client sending ON only on state changes loses contact
+after 180 s. Do not install this controller with an unverified client.
+Thermostat sources, build target and image are absent from this repository;
+there is no basis for a client update command or confirmation of reconnect.
 
-W `secrets.h` wpisz własne Wi-Fi, dane fallback AP oraz adres i dane logowania
-brokera MQTT. Nazwy opcji są w przykładzie. Pliki `secrets.h` i
-`relay_config.h` pozostają lokalne i ignorowane przez Git. Obraz korzystający
-z tych plików buduje się wyłącznie po jawnym wyborze:
+For an update, preserve local configuration, add assignments, prepare compatible
+images for both sides and shut down the installation before changing versions.
+Build the controller with `python3 scripts/b0-build.py --local-config`.
+The image is `build/b0/output/heating_server.ino.bin`; uploading requires the
+procedure for the confirmed board and is a separate operation. Upload compatible
+thermostat firmware with its own tool, then the controller. After restart,
+check OFF, heartbeat, new ON and shutdown of only the assigned CO after 180 s
+of silence. No upload or hardware tests were performed; absent client firmware
+blocks confirmation of compatibility across the installation.
 
-```sh
-python3 scripts/b0-build.py --local-config
-```
+## CI and repository contents
 
-Tabela `HEATING_RELAYS` ma pięć wierszy, kolejno dla ID pomp **1–4 CO i 5 CWU**.
-Każdy wiersz zawiera numer **GPIO ESP8266** i poziom aktywny: `0` lub `1`.
-To nie są etykiety Dx płytki ani identyfikatory pomp. Przykład pozostawia obie
-wartości jako `-1`: repozytorium nie zawiera potwierdzonego przypisania ani
-polaryzacji. Uzupełnij je z dokumentacji posiadanego modułu i okablowania.
+[GitHub Actions](.github/workflows/ci.yml) runs on push, pull request and
+`workflow_dispatch`. The macOS 15 ARM64 job prepares pinned dependencies,
+runs all four host targets normally and with ASan/UBSan, then builds the
+controller with example configuration. Its summary records target results,
+RAM/IRAM/flash usage and BIN size; the runner log is `build/b0/compile.log`.
+This describes the workflow, not a result of a particular execution.
 
-Driver odrzuca duplikaty GPIO, nieustaloną polaryzację, numery spoza 0–16,
-piny flash 6–11, Serial 1/3 oraz domyślne piny Wire używane przez LCD
-(w obecnym profilu 4/5). Nie ma implementacji ekspandera przekaźników.
-Skonfigurowane wyjścia startują OFF: najpierw ustawiany jest latch, potem tryb
-OUTPUT. Nieustalone lub nieuruchomione kanały odrzucają przełączenie.
-Stany pinów przed uruchomieniem firmware, obwody bootstrap, fizyczna
-polaryzacja i styki NO/NC wymagają sprawdzenia na sprzęcie.
-
-`HEATING_ENABLE_DOMESTIC_PLAN` domyślnie wynosi `false`. Opcja włącza istniejący
-plan CWU: start o 05:00, 06:00, 07:00, 12:00, 16:00, 19:00 i 21:00 oraz
-planowane OFF po 30 minutach. Niezależny limit CWU **15 minut** ma pierwszeństwo
-nad dłuższym oknem. Plan świąteczny nie jest zdefiniowany.
-
-## Dostępne działanie
-
-- UDP na porcie **3636**: `ON`, `OFF`, `SHOWSTATUS`, `SHOWSERVER`.
-  Wymagane pola JSON to `cmd`, `ID`, `actualTEMP`, `targetTEMP`; wartości
-  liczbowe mogą być liczbami JSON lub pełnymi ciągami liczbowymi.
-  ON/OFF dotyczą ID 1–4, status ID 1–5. SHOWSERVER uruchamia discovery,
-  nie rejestruje klienta. Niepoprawne pakiety nie zmieniają stanu.
-- ACK zachowuje `cmd=OK/NO`, `RUNNING=YES/NO`, `TIME` i `SERVERIP`.
-  Dodano `OUTPUT=ON/OFF/UNCONFIGURED`. OK dla przełączenia oznacza udany
-  zapis skonfigurowanego wyjścia; RUNNING opisuje stan programowy po komendzie,
-  a OUTPUT ostatni znany stan wyjścia. Żadne pole nie jest pomiarem pracy
-  pompy ani potwierdzeniem zamknięcia styku. Powtórne ON dla działającej pompy
-  i OFF dla wyłączonej nadal zwracają NO.
-- Czas pracy, minimalny czas ON i przerwa OFF są monotoniczne, odporne na
-  pojedyncze przepełnienie 32-bitowego `millis()` i skoki NTP. Zachowane limity:
-  CO **7720 minut**, CWU **15 minut**, minimum ON/OFF **1 minuta**.
-  Kontrola działa co sekundę także bez NTP i nie wymaga wolnego slotu schedulera.
-  Błąd OFF nie zeruje stanu ani licznika; następna kontrola ponawia próbę.
-- Modyfikator dzienny obejmuje godziny 11–13, nocny 23–05. Końce zachowują
-  dotychczasowe warunki: 22 i 06 są poza nocą. Bez ustawionego zegara
-  modyfikatory kalendarzowe są pomijane; podstawowe progi temperatur pozostają.
-- Scheduler obsługuje minutowe, godzinowe, dzienne, tygodniowe i miesięczne
-  zadania. Dni tygodnia mają zakres TimeLib 1–7. Miesięczne zadania pomijają
-  miesiąc bez wskazanego dnia. Pominięte terminy nie są odtwarzane; zadanie
-  może wykonać się raz w bieżącej zaplanowanej minucie, potem dostaje termin
-  w przyszłości. Cofnięcie NTP nie powtarza już wykonanych terminów.
-  Nieustawiony zegar wstrzymuje zadania kalendarzowe.
-- LCD I2C 20×4 pod adresem 0x27; synchronizacja NTP z zachowanym przesunięciem
-  UTC+1, bez automatycznej zmiany czasu letniego. Gdy zewnętrzne Wi-Fi zawiedzie
-  na starcie, centrala uruchamia AP. Discovery i odpowiedzi używają adresu AP.
-- MQTT obsługuje połączenie, dane logowania i subskrypcję. Reconnect wykonuje
-  jedną próbę na minutę; build ustawia timeout odpowiedzi MQTT na 1 sekundę,
-  a WiFiClient timeout DNS/TCP na 200 ms. Transport nadal jest synchroniczny;
-  rzeczywiste opóźnienia wymagają pomiaru na płytce. Schemat komend MQTT oraz
-  telemetria nie są zdefiniowane: odbiór komunikatu nie wykonuje sterowania.
-
-Pozostają do ustalenia: model i flash płytki, mapa GPIO/polaryzacja, zachowanie
-przy boot/reset i potwierdzenie wyjść, firmware i czujniki termostatów, polityka
-utraty termostatu/sieci oraz kontrakty rejestracji i sterowania MQTT. UDP nie ma
-uwierzytelniania ani powiązania ID z nadawcą. Priorytety pomp są w konfiguracji,
-ale nie definiują obecnie arbitrażu ani limitu jednoczesnych obiegów.
+CI uses `contents: read`, full-SHA action pins and the workflow token as
+`GH_TOKEN` for public releases. It needs no owner PAT or credentials and does
+not upload firmware. Generated BIN/ELF, Visual Studio `.VC.db` and
+`.vcxproj.user` files are ignored. Windows `.sln`, `.vcxproj`, their filters
+and root sources remain separate from the controller build.

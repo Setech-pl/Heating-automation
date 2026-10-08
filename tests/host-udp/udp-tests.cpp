@@ -54,7 +54,7 @@ void deliver(UDPMessengerService &service, const std::string &packet,
 
 bool same(const tClientCommand &a, const tClientCommand &b)
 {
-  return a.ID == b.ID && std::memcmp(a.cmd, b.cmd, sizeof(a.cmd)) == 0 &&
+  return a.ID == b.ID && a.serial == b.serial && std::memcmp(a.cmd, b.cmd, sizeof(a.cmd)) == 0 &&
     a.actualTEMP == b.actualTEMP && a.targetTEMP == b.targetTEMP &&
     a.actualHum == b.actualHum && a.isRunning == b.isRunning &&
     std::memcmp(a.serialID, b.serialID, sizeof(a.serialID)) == 0 &&
@@ -74,14 +74,15 @@ bool consume(UDPMessengerService &service)
 }
 
 void accept(UDPMessengerService &service, const std::string &packet,
-            const char *cmd = "ON", int id = 1, float actual = 18, float target = 21)
+            const char *cmd = "ON", int id = 1, float actual = 18, float target = 21, uint32_t serial = 0)
 {
   context = "accept " + packet.substr(0, 100);
   int before = publications;
   int sends = transport.sends;
   deliver(service, packet);
   tClientCommand expected = {};
-  expected.ID = id;
+  expected.ID = id; expected.serial = serial;
+  if (serial) std::snprintf(expected.serialID, sizeof(expected.serialID), "%lu", static_cast<unsigned long>(serial));
   std::strcpy(expected.cmd, cmd);
   expected.actualTEMP = actual;
   expected.targetTEMP = target;
@@ -115,6 +116,23 @@ int main()
   require(same(service.getCurrentCommand(), tClientCommand{}), "initialized initial state");
   require(!consume(service), "no initial command");
   reject(service, "");
+  for (const char *cmd : {"HEARTBEAT", "ON", "OFF"}) {
+    std::string packet = message(std::string("\"") + cmd + "\"");
+    packet.pop_back(); packet += ",\"serial\":\"1001\"}";
+    accept(service,packet,cmd,1,18,21,1001);
+    for (const char *bad : {"0", "-1", "4294967296", "true", "null", "[]", "{}", "1.0", "1e0", "\"\"", "\"1x\"", "\" 1\"", "\"+1\"", "\"12345678901\""}) {
+      std::string invalid = message(std::string("\"") + cmd + "\"");
+      invalid.pop_back(); invalid += std::string(",\"serial\":") + bad + '}';
+      reject(service,invalid);
+    }
+  }
+  accept(service, "{\"cmd\":\"HEARTBEAT\",\"ID\":4,\"serial\":4294967295,\"actualTEMP\":18,\"targetTEMP\":21}", "HEARTBEAT",4,18,21,UINT32_MAX);
+  reject(service,message("\"HEARTBEAT\""));
+  for (const char *id : {"0", "5", "-1", "2147483647", "true", "null"}) {
+    std::string invalid = message("\"HEARTBEAT\"",id);
+    invalid.pop_back(); invalid += ",\"serial\":1001}"; reject(service,invalid);
+  }
+
   for (const char *cmd : {"ON", "OFF", "SHOWSERVER", "SHOWSTATUS"})
   {
     accept(service, message(std::string("\"") + cmd + "\""), cmd);
@@ -204,7 +222,7 @@ int main()
   for (int i = 0; i < 30; ++i) manyFields += ",\"x" + std::to_string(i) + "\":0";
   reject(service, manyFields + '}');
   for (size_t length : {size_t(31), size_t(32), size_t(33), size_t(300)})
-    accept(service, message().substr(0, message().size() - 1) +
+    reject(service, message().substr(0, message().size() - 1) +
            ",\"serial\":\"" + std::string(length, 'S') + "\",\"versionC\":\"1.1\"}");
   accept(service, message().substr(0, message().size() - 1) +
          ",\"ignored\":{\"list\":[null,true,false,\"escaped\\\"\\\\\\/\\b\\f\\n\\r\\t\"]}}");

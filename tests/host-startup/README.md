@@ -1,40 +1,55 @@
-# Regresje MQTT, NTP i LCD centrali
+# Controller MQTT, NTP and LCD regressions
 
-Z katalogu głównego produktu, po przygotowaniu zależności:
+[Polski](README.pl.md) | English | [Project README](../../README.md)
+
+From the repository root, after preparing dependencies:
 
 ```sh
 python3 scripts/test-host-startup.py
 python3 scripts/test-host-startup.py --sanitize
 ```
 
-Wymagania: Python ≥3.9, Clang (`CXX` może wskazać inny Clang) i przypięty,
-czysty checkout NTPClient 3.2.0 w `.arduino/user/libraries/NTPClient`.
-Skrypt nie pobiera zależności. Pliki produkcyjne `utils`, `screen`, `scheduler`,
-`heating_config`, `relay_output` i `createDailyPlan` są kopiowane do ignorowanego
-`build/host-startup/{normal,sanitize}/source`, tak jak przy buildzie firmware,
-aby `secrets.h` wskazywało wyłącznie przykład. Nie ma osobnej implementacji
-logiki w testach ani odczytu lokalnych sekretów.
+Requirements: Python ≥3.9, Clang (`CXX` can select another Clang) and a pinned,
+clean NTPClient 3.2.0 checkout in `.arduino/user/libraries/NTPClient`.
+The script does not download dependencies. Production `utils`, `screen`,
+`scheduler`, `heating_config`, `relay_output` and `createDailyPlan` files are
+copied into ignored `build/host-startup/{normal,sanitize}/source`, as in the
+firmware build, so `secrets.h` selects only the example. Tests contain no
+separate implementation of the logic and do not read local credentials.
 
-Target wykonuje produkcyjne formatowanie tematu, ograniczoną synchronizację
-startową, komendę NTP oraz render ekranu. Kompiluje rzeczywisty NTPClient:
-fake UDP podaje pakiet NTP lub timeout. Adaptery zastępują tylko interfejsy
-Arduino, Wi-Fi/UDP, zegar i LCD. Czas jest deterministyczny, `delay` przesuwa
-licznik bez czekania. Nie ma połączeń sieciowych ani dostępu do sprzętu.
+The target executes production topic formatting, bounded startup
+synchronization, the NTP command and screen rendering. It compiles the real
+NTPClient: fake UDP supplies an NTP packet or timeout. Adapters replace only
+Arduino, Wi-Fi/UDP, the clock and LCD interfaces. Time is deterministic;
+`delay` advances a counter without waiting. There are no network connections
+or hardware access.
 
-Regresje sprawdzają temat dla pomp 1–4 (domena istniejącego controllera),
-bufor dokładnego rozmiaru i za mały, odrzucenie uciętego tematu i niepoprawnych
-ID; sukces NTP na próbach 1/3/5, timeout i limit 5 prób, AP bez prób i bez
-zmiany zegara; inicjalizację komunikatu komendy oraz pierwszy i niezmieniony
-render na pamięci z różnymi wzorcami; tekst LCD długości 0/19/20/21/100,
-graniczne IPv4 oraz wybór STA/AP i format IP w menu. LCD przycina i dopełnia
-tekst do 20 znaków; formatowanie tematu MQTT zwraca błąd i pusty bufor
-przy ucięciu. Wynik NTP rozróżnia pominięcie, synchronizację i błąd.
+Regressions check topics for pumps 1–4 (the existing controller domain),
+exact-size and undersized buffers, truncated-topic and invalid-ID rejection;
+NTP success on attempts 1/3/5, timeout and the five-attempt limit, AP mode
+without attempts or clock changes; command-result initialization and first
+and unchanged renders on memory with different patterns; LCD text lengths
+0/19/20/21/100, boundary IPv4 values, STA/AP selection and IP formatting in the
+menu. LCD truncates/pads text to 20 characters. MQTT topic formatting returns
+failure and an empty buffer on truncation. NTP results distinguish skipped,
+synchronized and failed.
 
-Tryb `--sanitize` wykonuje ASan/UBSan z zatrzymaniem po pierwszym błędzie;
-LeakSanitizer jest wyłączony na macOS. ASan/UBSan nie wykrywają wszystkich
-odczytów niezainicjalizowanych danych; wzorce pamięci i obserwacja renderu są
-osobną regresją. To test modułów używanych przez szkic, nie pełnego `setup()`
-ani routera/schedulera. Istniejące ostrzeżenia pozostałych modułów są widoczne.
-Build firmware i regresje UDP należy uruchamiać oddzielnie.
-Pełne `setup()`/`loop()`, kalendarz, limity, GPIO i rzeczywisty timeout MQTT
-obejmuje `scripts/test-host-runtime.py`, także z opcją `--sanitize`.
+`--sanitize` runs ASan/UBSan, stopping at the first error; LeakSanitizer is
+disabled on macOS. ASan/UBSan do not detect every uninitialized read; memory
+patterns and observed rendering provide a separate regression. This target
+tests modules used by the sketch, not the full `setup()` or router/scheduler.
+Existing warnings from other modules remain visible. Run firmware compilation
+and UDP regressions separately.
+
+The full `setup()`/`loop()`, calendar, limits, GPIO and actual MQTT timeout
+are covered by `scripts/test-host-runtime.py`, also with `--sanitize`.
+Runtime also checks thermostat contact through the actual parser, scheduler
+and observable driver: 179 999/180 000 ms, contact renewal, HEARTBEAT without ON,
+no restart after timeout, new ON with a one-minute OFF interval, cancellation
+of pending and retained ON, two circuits, invalid fields and IDs, wrong serial,
+startup/restart OFF, clock rollover, retry after failed OFF and single
+loss/recovery logs. Existing temperature gates, CO 7720 min and CWU 15 min
+limit regressions remain active.
+Controller tests simulate client HEARTBEAT; they cannot test 60 s transmission
+or reconnect queue discard in the absent thermostat firmware.
+Hardware tests: NOT RUN. See the [architecture](../../docs/ARCHITECTURE.md).

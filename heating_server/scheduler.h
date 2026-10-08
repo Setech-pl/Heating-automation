@@ -126,7 +126,10 @@ public:
 	bool execute() override;
 	bool requiresClock() const override { return !disposable; }
 	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *config = nullptr)
-		: hCommand(disposable, scheduleTime, scheduleType, payload, config) {};
+		: hCommand(disposable, scheduleTime, scheduleType, payload, config),
+		  _generation(config ? config->requestGeneration(payload) : 0) {};
+private:
+	uint32_t _generation;
 };
 
 class hPumpsController
@@ -140,6 +143,7 @@ public:
 	bool turnOnDomesticWaterPumpReq(tm tTime);
 	bool turnOffDomesticWaterPumpReq(tm tTime);
 	void sanityCheck();
+	void checkThermostatTimeouts();
 	bool forceStopPump(int pumpNumber);
 
 private:

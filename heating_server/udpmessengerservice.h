@@ -20,7 +20,9 @@
 }
 
 
- {"cmd":"ON","ID":"11","serial":"1123456","versionC":"11.1","actualTEMP":36.6,"targetTEMP":38.6}
+ {"cmd":"HEARTBEAT","ID":1,"serial":"123456","actualTEMP":20,"targetTEMP":21}
+ // ON/OFF retain their temperature and switching gates. Local configuration
+ // binds serial to CO ID 1-4. HEARTBEAT renews contact without switching.
  */
 
 struct tClientCommand
@@ -31,6 +33,7 @@ struct tClientCommand
   float targetTEMP;
   float actualHum;
   char serialID[32];
+  uint32_t serial = 0;
   char versionC[12];
   bool isRunning = false;
 };

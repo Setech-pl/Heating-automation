@@ -91,6 +91,11 @@ void setup()
 {
   Serial.begin(115200);
   if (!relayOutputs.begin()) Serial.println("Some relay channels are unconfigured");
+  for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; ++i) {
+    thermoClientStat thermostat;
+    thermostat.ID = i; thermostat.serialChip = HEATING_THERMOSTAT_SERIALS[i - 1];
+    if (!config->registerClient(thermostat)) Serial.println("Thermostat assignment disabled or invalid");
+  }
   Serial.println("Entering setup mode");
   int counter = 0;
   bool wynik = false;
@@ -182,6 +187,9 @@ void hook_mqtt_reconnect()
 
 void loop()
 {
+  // Expire and cancel requests before scheduler execution or contact renewal.
+  // This check runs on every iteration, even without packets or an NTP clock.
+  heatPumpController->checkThermostatTimeouts();
 
   if (heatingTickDue(static_cast<uint32_t>(millis()), timeMillis, 1000))
   {
@@ -203,7 +211,20 @@ void loop()
   {
     tClientCommand temp = udpMessenger.getCurrentCommand();
 
-    if (strcmp(temp.cmd, "ON") == 0)
+    bool control = strcmp(temp.cmd, "ON") == 0 || strcmp(temp.cmd, "OFF") == 0;
+    bool heartbeat = strcmp(temp.cmd, "HEARTBEAT") == 0;
+    bool assigned = false;
+    if (control || heartbeat) {
+      assigned = config->recordContact(temp.ID, temp.serial, strcmp(temp.cmd, "ON") == 0);
+      if (!assigned) {
+        udpMessenger.sendBackMessage(false, config->getPumpStatus(temp.ID), outputStateName(temp.ID));
+      }
+      if (assigned && heartbeat) {
+        udpMessenger.sendBackMessage(true, config->getPumpStatus(temp.ID), outputStateName(temp.ID));
+      }
+    }
+
+    if (assigned && strcmp(temp.cmd, "ON") == 0)
     {
       char tm[20];
       snprintf(tm, sizeof(tm), "Pump %d ON", temp.ID);
@@ -222,7 +243,7 @@ void loop()
       }
     }
 
-    if (strcmp(temp.cmd, "OFF") == 0)
+    if (assigned && strcmp(temp.cmd, "OFF") == 0)
     {
       char tm[20];
       snprintf(tm, sizeof(tm), "Pump %d OFF", temp.ID);

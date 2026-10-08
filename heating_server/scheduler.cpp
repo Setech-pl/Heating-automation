@@ -304,6 +304,8 @@ bool hPumpCommand::execute()
 	bool running = payload >= 1 && payload <= _MAX_HEATING_PUMPS_NO;
 	int pump = running ? payload : payload - 10;
 	if (pump < 1 || pump > _MAX_HEATING_PUMPS_NO) return false;
+	if (running && (!_config->heatingAllowed(pump) ||
+		_generation != _config->requestGeneration(pump) || !_config->canRestartPump(pump))) return false;
 	return _config->switchPump(pump, running);
 }
 
@@ -328,7 +330,7 @@ bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 {
 	if (!isfinite(actualTemp) || !isfinite(setTemp) || pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO)
 		return false;
-	bool canTurnOn = _config->canRestartPump(pumpNumber);
+	bool canTurnOn = _config->heatingAllowed(pumpNumber) && _config->canRestartPump(pumpNumber);
 	float tempModifier = 0;
 	int currentHour = hour();
 	if (timeStatus() != timeNotSet && currentHour > 10 && currentHour < 14)
@@ -440,9 +442,21 @@ bool hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
 
 bool hPumpsController::forceStopPump(int pumpNumber)
 {
+	_config->revokeHeating(pumpNumber);
+	if (pumpNumber >= 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO)
+		removeDailyPlan(pumpNumber); // Remove queued CO ON/OFF; preserve the independent CWU plan.
 	if (!_config->switchPump(pumpNumber, false)) return false;
 	_config->setPumpStatusOff(pumpNumber);
+	_config->completeSafetyStop(pumpNumber);
 	return true;
+}
+
+void hPumpsController::checkThermostatTimeouts()
+{
+	for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; ++i) {
+		_config->expireContact(i);
+		if (_config->safetyStopRequired(i)) forceStopPump(i);
+	}
 }
 
 void hPumpsController::sanityCheck()

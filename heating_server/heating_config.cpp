@@ -102,6 +102,7 @@ uint64_t hConfigurator::uptime()
 
 bool hConfigurator::switchPump(int pumpNumber, bool running)
 {
+	if (running && pumpNumber <= _MAX_HEATING_PUMPS_NO && !heatingAllowed(pumpNumber)) return false;
 	return _outputs != nullptr && _outputs->set(pumpNumber, running);
 }
 
@@ -157,9 +158,71 @@ int hConfigurator::getPercentage(int pumpNumber)
 
 hConfigurator::~hConfigurator() = default;
 
-bool hConfigurator::registerClient(thermoClientStat /*client*/)
+bool hConfigurator::registerClient(thermoClientStat client)
 {
-	return false; // No client registration protocol has been supplied.
+	if (client.ID < 1 || client.ID > _MAX_HEATING_PUMPS_NO || client.serialChip == 0) return false;
+	Contact &contact = _clients[client.ID - 1];
+	if (contact.serial != 0) return contact.serial == client.serialChip;
+	for (const Contact &other : _clients)
+		if (other.serial == client.serialChip) return false;
+	contact.serial = client.serialChip; // Local configuration only; packets never register clients.
+	return true;
+}
+
+bool hConfigurator::recordContact(int pumpNumber, uint32_t serial, bool newOn)
+{
+	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO || serial == 0) return false;
+	Contact &contact = _clients[pumpNumber - 1];
+	if (contact.serial != serial) return false;
+	// Expire before renewing even if no loop iteration ran at the boundary.
+	expireContact(pumpNumber);
+	if (contact.lost) {
+		Serial.print("Thermostat contact recovered: "); Serial.println(pumpNumber);
+	}
+	contact.last = uptime(); contact.seen = true; contact.lost = false;
+	if (newOn && !contact.stopRequired) contact.allowOn = true;
+	return true;
+}
+
+bool hConfigurator::expireContact(int pumpNumber)
+{
+	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO) return false;
+	Contact &contact = _clients[pumpNumber - 1];
+	if (!contact.seen || contact.lost || uptime() - contact.last < _THERMOSTAT_TIMEOUT_MS) return false;
+	contact.lost = true;
+	revokeHeating(pumpNumber);
+	Serial.print("Thermostat contact lost: "); Serial.println(pumpNumber);
+	return true;
+}
+
+bool hConfigurator::heatingAllowed(int pumpNumber)
+{
+	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO) return false;
+	expireContact(pumpNumber);
+	const Contact &contact = _clients[pumpNumber - 1];
+	return contact.seen && !contact.lost && contact.allowOn && !contact.stopRequired;
+}
+
+uint32_t hConfigurator::requestGeneration(int pumpNumber) const
+{
+	return pumpNumber >= 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO ? _clients[pumpNumber - 1].generation : 0;
+}
+
+void hConfigurator::revokeHeating(int pumpNumber)
+{
+	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO) return;
+	Contact &contact = _clients[pumpNumber - 1];
+	contact.allowOn = false; contact.stopRequired = true; ++contact.generation;
+}
+
+bool hConfigurator::safetyStopRequired(int pumpNumber) const
+{
+	return pumpNumber >= 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO && _clients[pumpNumber - 1].stopRequired;
+}
+
+void hConfigurator::completeSafetyStop(int pumpNumber)
+{
+	if (pumpNumber >= 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO) _clients[pumpNumber - 1].stopRequired = false;
 }
 
 hConfigurator::hConfigurator(hRelayOutputs *outputs)

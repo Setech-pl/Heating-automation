@@ -50,6 +50,19 @@ public:
 // Synthetic host-only mapping, never a proposed physical board configuration.
 static const hRelayPin fixturePins[5] = {{0,1}, {2,0}, {12,1}, {13,0}, {14,1}};
 
+static void assign(hConfigurator &state, int id, bool on = true) {
+  thermoClientStat thermostat;
+  thermostat.ID = id; thermostat.serialChip = 1000 + id;
+  CHECK(state.registerClient(thermostat));
+  CHECK(state.recordContact(id, 1000 + id, on));
+}
+static void assignAll(hConfigurator &state) {
+  for (int id = 1; id <= 4; ++id) {
+    thermoClientStat thermostat; thermostat.ID = id; thermostat.serialChip = 1000 + id;
+    CHECK(state.registerClient(thermostat));
+  }
+}
+
 static void calendar() {
   int runs = 0;
   clockAt(epoch(2026,10,10,23,59)); // Saturday (TimeLib day 7).
@@ -177,7 +190,8 @@ static void gpioAndCommands() {
   CHECK(arduino.set(5,true)); CHECK(gpioCalls().back().pin == 14 && gpioCalls().back().value == 1);
 
   clockAt(epoch(2026,10,8,15)); platform.milliseconds = 0;
-  hConfigurator state(&outputs); hScheduler tasks; hPumpsController controller(&tasks,&state);
+  hConfigurator state(&outputs); assignAll(state); hScheduler tasks; hPumpsController controller(&tasks,&state);
+  assign(state,1);
   adapter.failWrite = true;
   CHECK(!controller.turnOnHeatPumpReq(1,18,21)); CHECK(!state.getPumpStatus(1));
   CHECK(tasks.activeTaskCount() == 0);
@@ -204,8 +218,8 @@ static void gpioAndCommands() {
 static void timeAndLimits() {
   clockAt(epoch(2026,10,8,15)); platform.milliseconds = 0xfffffff0UL;
   TestGpio adapter; hRelayOutputs outputs(adapter,fixturePins); CHECK(outputs.begin());
-  hConfigurator state(&outputs); hScheduler tasks; hPumpsController controller(&tasks,&state);
-  CHECK(controller.turnOnHeatPumpReq(1,18,21));
+  hConfigurator state(&outputs); assignAll(state); hScheduler tasks; hPumpsController controller(&tasks,&state);
+  assign(state,1); CHECK(controller.turnOnHeatPumpReq(1,18,21));
   state.tickMinutes(); CHECK(state.getPumpRunningMinuts(1) == 0);
   platform.milliseconds = uint32_t(0xfffffff0U + 59999U);
   state.tickMinutes(); CHECK(state.getPumpRunningMinuts(1) == 0);
@@ -215,7 +229,7 @@ static void timeAndLimits() {
   clockAt(epoch(2025,1,1)); // Calendar jumps do not change runtime or history.
   state.tickMinutes(); CHECK(state.getPumpRunningMinuts(1) == 120);
   CHECK(state.lastOnOffPump(1,1) == 0); CHECK(state.getPercentage(1) == 100);
-  CHECK(controller.turnOnHeatPumpReq(2,18,21));
+  assign(state,2); CHECK(controller.turnOnHeatPumpReq(2,18,21));
   platform.milliseconds += 120 * 60000;
   state.tickMinutes(); CHECK(state.getPercentage(1) == 66 && state.getPercentage(2) == 33);
   for (int id : {INT_MIN,0,6,INT_MAX}) {
@@ -237,8 +251,8 @@ static void timeAndLimits() {
   CHECK(state.lastOnOffPump(3,1) == 0);
 
   platform.milliseconds = 0; clockAt(epoch(2026,10,8,15));
-  hConfigurator limited(&outputs); hPumpsController limiter(&tasks,&limited);
-  CHECK(limiter.turnOnHeatPumpReq(4,18,21));
+  hConfigurator limited(&outputs); assignAll(limited); hPumpsController limiter(&tasks,&limited);
+  limiter.checkThermostatTimeouts(); assign(limited,4); CHECK(limiter.turnOnHeatPumpReq(4,18,21));
   platform.milliseconds = uint32_t(_MAX_HEATING_PUMP_RUNNING_MINUTES) * 60000 - 1;
   limiter.sanityCheck(); CHECK(limited.getPumpStatus(4));
   platform.milliseconds += 1;
@@ -255,7 +269,7 @@ static void timeAndLimits() {
   limiter.sanityCheck(); CHECK(!limited.getPumpStatus(5));
   // Expiry does not need a free task slot and cannot be blocked by min-ON validation.
   platform.milliseconds += 60000;
-  CHECK(limiter.turnOnHeatPumpReq(4,18,21));
+  limiter.checkThermostatTimeouts(); assign(limited,4); CHECK(limiter.turnOnHeatPumpReq(4,18,21));
   int unused = 0;
   for (int i = 0; i < 512; ++i) CHECK(tasks.addTask(new Counting(unused, scheduleAt(0,0), daily)) == i);
   platform.milliseconds += uint32_t(_MAX_HEATING_PUMP_RUNNING_MINUTES) * 60000;
@@ -266,12 +280,12 @@ static void nightAndPlan() {
   for (int h : {21,22,23,0,5,6}) {
     platform.milliseconds = 0; clockAt(epoch(2026,10,8,h));
     TestGpio adapter; hRelayOutputs outputs(adapter,fixturePins); CHECK(outputs.begin());
-    hConfigurator state(&outputs); hScheduler tasks; hPumpsController controller(&tasks,&state);
-    CHECK(controller.turnOnHeatPumpReq(1,20,21) == !(h > 22 || h < 6));
+    hConfigurator state(&outputs); assignAll(state); hScheduler tasks; hPumpsController controller(&tasks,&state);
+    assign(state,1); CHECK(controller.turnOnHeatPumpReq(1,20,21) == !(h > 22 || h < 6));
   }
   clockAt(epoch(2026,10,8,4,59)); platform.milliseconds = 0;
   TestGpio adapter; hRelayOutputs outputs(adapter,fixturePins); CHECK(outputs.begin());
-  hConfigurator state(&outputs); hScheduler tasks; hPumpsController controller(&tasks,&state);
+  hConfigurator state(&outputs); assignAll(state); hScheduler tasks; hPumpsController controller(&tasks,&state);
   CHECK(!controller.createDailyPlan(true)); CHECK(tasks.activeTaskCount() == 0);
   CHECK(controller.createDailyPlan(false)); CHECK(tasks.activeTaskCount() == 14);
   CHECK(!controller.createDailyPlan(false)); CHECK(tasks.activeTaskCount() == 14);
@@ -313,7 +327,7 @@ static void ticksAndReconnect() {
 
 static void datagram(const char *cmd, int id) {
   char packet[180];
-  snprintf(packet,sizeof(packet),"{\"cmd\":\"%s\",\"ID\":%d,\"actualTEMP\":18,\"targetTEMP\":21}",cmd,id);
+  snprintf(packet,sizeof(packet),"{\"cmd\":\"%s\",\"ID\":%d,\"serial\":%u,\"actualTEMP\":18,\"targetTEMP\":21}",cmd,id,id >= 1 && id <= 4 ? unsigned(1000 + id) : 1U);
   datagrams().packet = packet; datagrams().reportedSize = std::strlen(packet);
   loop();
 }
@@ -340,7 +354,7 @@ static void setupAndLoop() {
   CHECK(client.attempts == 1); // No loop-driven retry storm.
 
   TestGpio adapter; hRelayOutputs outputs(adapter,fixturePins); CHECK(outputs.begin());
-  hConfigurator state(&outputs); hPumpsController controller(scheduler,&state);
+  hConfigurator state(&outputs); assignAll(state); hPumpsController controller(scheduler,&state);
   config = &state; heatPumpController = &controller;
   datagram("ON",1); ack("OK","YES","ON");
   datagram("OFF",1); ack("NO","YES","ON");
@@ -367,7 +381,150 @@ static void setupAndLoop() {
   internalWIFIMode = false;
 }
 
+static void rawPacket(const std::string &packet) {
+  datagrams().packet = packet; datagrams().reportedSize = packet.size(); loop();
+}
+static void watchdog() {
+  platform.milliseconds = 0; clockAt(epoch(2026,10,8,15));
+  scheduler->removeAllCommands(); Serial.contactEvents.clear();
+  TestGpio adapter; hRelayOutputs outputs(adapter,fixturePins); CHECK(outputs.begin());
+  hConfigurator state(&outputs); assignAll(state);
+  hPumpsController controller(scheduler,&state);
+  config = &state; heatPumpController = &controller;
+  for (int id = 1; id <= 4; ++id) {
+    CHECK(!state.getPumpStatus(id)); CHECK(outputs.state(id) == hRelayOutputs::off);
+    hPumpCommand unrequested(true,{},hourly,id,&state); CHECK(!unrequested.execute());
+  }
+  thermoClientStat duplicate; duplicate.ID = 2; duplicate.serialChip = 1001;
+  CHECK(!state.registerClient(duplicate));
+  duplicate.ID = 0; CHECK(!state.registerClient(duplicate));
+  duplicate.ID = 5; CHECK(!state.registerClient(duplicate));
+  hConfigurator empty;
+  duplicate.ID = 1; CHECK(empty.registerClient(duplicate));
+  duplicate.ID = 2; CHECK(!empty.registerClient(duplicate));
+  duplicate.serialChip = 0; CHECK(!empty.registerClient(duplicate));
+
+  datagram("HEARTBEAT",1); ack("OK","NO","OFF"); // Idle thermostat cannot start heating.
+  CHECK(!controller.turnOnHeatPumpReq(1,18,21));
+  datagram("ON",1); ack("OK","YES","ON");
+  datagram("ON",2); ack("OK","YES","ON");
+  platform.milliseconds = 60000; datagram("HEARTBEAT",2);
+  platform.milliseconds = 179999; loop();
+  CHECK(state.getPumpStatus(1)); CHECK(state.getPumpStatus(2));
+  platform.calendarValid = false; // Timeout is independent of NTP.
+  platform.milliseconds = 180000; loop();
+  CHECK(!state.getPumpStatus(1)); CHECK(outputs.state(1) == hRelayOutputs::off);
+  CHECK(state.getPumpStatus(2)); CHECK(outputs.state(2) == hRelayOutputs::on);
+  CHECK(Serial.contactEvents.size() == 1);
+  int writes = adapter.writes; loop(); loop(); CHECK(adapter.writes == writes);
+  datagram("HEARTBEAT",1); ack("OK","NO","OFF");
+  CHECK(Serial.contactEvents.size() == 2);
+  datagram("HEARTBEAT",1); CHECK(Serial.contactEvents.size() == 2);
+  CHECK(!controller.turnOnHeatPumpReq(1,18,21)); // Heartbeat does not restore ON permission.
+  datagram("ON",1); ack("NO","NO","OFF"); // Existing minimum OFF interval.
+  platform.milliseconds = 240000;
+  datagram("ON",1); ack("OK","YES","ON"); // New ON with normal gates.
+  datagram("HEARTBEAT",2); CHECK(!state.getPumpStatus(2)); // Its own 180 s boundary.
+
+  // Pending and borrowed stale commands must never survive timeout + a fresh ON.
+  hPumpCommand stale(true,{},hourly,1,&state);
+  CHECK(scheduler->addTask(new hPumpCommand(true,{},hourly,1,&state)) >= 0);
+  CHECK(scheduler->activeTaskCount() == 1);
+  platform.milliseconds = 420000; loop();
+  CHECK(scheduler->activeTaskCount() == 0); CHECK(!stale.execute());
+  datagram("HEARTBEAT",1); CHECK(!state.getPumpStatus(1)); CHECK(!stale.execute());
+  platform.milliseconds = 480000; datagram("ON",1); ack("OK","YES","ON");
+  CHECK(!stale.execute());
+
+  // Discovery/status, wrong identity and invalid input do not keep circuit 1 alive.
+  platform.milliseconds = 600000;
+  datagram("SHOWSTATUS",1); datagram("SHOWSERVER",1);
+  rawPacket("{\"cmd\":\"HEARTBEAT\",\"ID\":1,\"serial\":1002,\"actualTEMP\":18,\"targetTEMP\":21}");
+  ack("NO","YES","ON");
+  for (const char *bad : {
+    "{\"cmd\":\"HEARTBEAT\",\"ID\":0,\"serial\":1001,\"actualTEMP\":18,\"targetTEMP\":21}",
+    "{\"cmd\":\"HEARTBEAT\",\"ID\":1,\"serial\":true,\"actualTEMP\":18,\"targetTEMP\":21}",
+    "{\"cmd\":\"ON\",\"ID\":1,\"serial\":1001,\"actualTEMP\":\"nan\",\"targetTEMP\":21}",
+    "{\"cmd\":\"HEARTBEAT\",\"ID\":1,\"serial\":1001,\"actualTEMP\":18}",
+    "{\"cmd\":\"HEARTBEAT\",\"ID\":true,\"serial\":1001,\"actualTEMP\":18,\"targetTEMP\":21}"
+  }) rawPacket(bad);
+  datagram("HEARTBEAT",3); // Other assigned client has no effect on 1.
+  platform.milliseconds = 659999; loop(); CHECK(state.getPumpStatus(1));
+  platform.milliseconds = 660000; loop(); CHECK(!state.getPumpStatus(1));
+
+  // OFF and even policy-rejected control packets from the owner renew contact.
+  platform.calendarValid = true; clockAt(epoch(2026,10,8,15));
+  platform.milliseconds = 720000; datagram("ON",1); CHECK(state.getPumpStatus(1));
+  platform.milliseconds = 899999;
+  rawPacket("{\"cmd\":\"ON\",\"ID\":1,\"serial\":1001,\"actualTEMP\":40,\"targetTEMP\":21}");
+  ack("NO","YES","ON");
+  platform.milliseconds = 900000; loop(); CHECK(state.getPumpStatus(1));
+  platform.milliseconds = 1079998; loop(); CHECK(state.getPumpStatus(1));
+  datagram("OFF",1); ack("OK","NO","OFF");
+  platform.milliseconds += 179999; datagram("HEARTBEAT",1);
+  CHECK(!state.getPumpStatus(1));
+
+  // Driver failures preserve output state, revoke pending ON and retry safely.
+  platform.milliseconds += 60000; datagram("ON",1); CHECK(state.getPumpStatus(1));
+  CHECK(scheduler->addTask(new hPumpCommand(true,{},hourly,1,&state)) >= 0);
+  adapter.failWrite = true; platform.milliseconds += 180000; loop();
+  CHECK(state.getPumpStatus(1)); CHECK(outputs.state(1) == hRelayOutputs::on);
+  CHECK(scheduler->activeTaskCount() == 0); CHECK(!state.heatingAllowed(1));
+  datagram("HEARTBEAT",1); datagram("ON",1); CHECK(!state.heatingAllowed(1));
+  adapter.failWrite = false; loop(); CHECK(!state.getPumpStatus(1));
+  datagram("HEARTBEAT",1); CHECK(!state.heatingAllowed(1));
+
+  // Start/restart clears permission; both polarities initialize OFF.
+  CHECK(outputs.begin());
+  hConfigurator restarted(&outputs); assignAll(restarted);
+  hPumpsController fresh(scheduler,&restarted); config = &restarted; heatPumpController = &fresh;
+  datagram("HEARTBEAT",1); CHECK(!restarted.getPumpStatus(1));
+  CHECK(outputs.state(1) == hRelayOutputs::off && outputs.state(2) == hRelayOutputs::off);
+  platform.milliseconds = 0xfffffff0U;
+  hConfigurator rollover(&outputs); assignAll(rollover);
+  hPumpsController wrap(scheduler,&rollover); config = &rollover; heatPumpController = &wrap;
+  datagram("ON",1); CHECK(rollover.getPumpStatus(1));
+  platform.milliseconds = uint32_t(0xfffffff0U + 179999U); loop(); CHECK(rollover.getPumpStatus(1));
+  platform.milliseconds = uint32_t(0xfffffff0U + 180000U); loop(); CHECK(!rollover.getPumpStatus(1));
+
+  // Simulated regular heartbeat keeps an idle circuit OFF and a running one ON,
+  // without resetting the existing runtime counter. This is a receiver test.
+  platform.milliseconds = 0; clockAt(epoch(2026,10,8,15));
+  hConfigurator regular(&outputs); assignAll(regular);
+  hPumpsController receiving(scheduler,&regular); config = &regular; heatPumpController = &receiving;
+  datagram("ON",1); CHECK(regular.getPumpStatus(1));
+  for (int minute = 1; minute <= 10; ++minute) {
+    platform.milliseconds = minute * 60000;
+    datagram("HEARTBEAT",1); datagram("HEARTBEAT",2);
+    CHECK(regular.getPumpStatus(1)); CHECK(!regular.getPumpStatus(2));
+  }
+  regular.tickMinutes(); CHECK(regular.getPumpRunningMinuts(1) == 10);
+  // A changed network endpoint still identifies the same configured owner.
+  datagrams().sender = IPAddress(192,0,2,77); datagrams().port = 4321;
+  datagram("HEARTBEAT",1); ack("OK","YES","ON");
+
+  // A full scheduler cannot prevent timeout. Cancellation preserves another
+  // circuit's delayed ON and all recurring CWU tasks.
+  platform.milliseconds = 0;
+  CHECK(outputs.begin());
+  hConfigurator crowded(&outputs); assignAll(crowded);
+  hPumpsController crowdedController(scheduler,&crowded); config = &crowded; heatPumpController = &crowdedController;
+  datagram("ON",1); datagram("ON",2);
+  CHECK(crowdedController.createDailyPlan(false));
+  CHECK(scheduler->addTask(new hPumpCommand(false,scheduleAt(17,0),daily,1,&crowded)) >= 0);
+  CHECK(scheduler->addTask(new hPumpCommand(false,scheduleAt(17,0),daily,2,&crowded)) >= 0);
+  int unused = 0;
+  for (int i = 16; i < 512; ++i) CHECK(scheduler->addTask(new Counting(unused,scheduleAt(17,0),daily)) == i);
+  platform.milliseconds = 60000; datagram("HEARTBEAT",2);
+  platform.milliseconds = 180000; loop();
+  CHECK(!crowded.getPumpStatus(1)); CHECK(outputs.state(1) == hRelayOutputs::off);
+  CHECK(crowded.getPumpStatus(2)); CHECK(scheduler->activeTaskCount() == 511);
+  CHECK(!crowdedController.createDailyPlan(false)); // All 14 existing CWU tasks remain.
+  scheduler->removeAllCommands();
+  config = &configInstance; heatPumpController = &controllerInstance;
+}
+
 int main() {
-  calendar(); gpioAndCommands(); timeAndLimits(); nightAndPlan(); ticksAndReconnect(); setupAndLoop();
+  calendar(); gpioAndCommands(); timeAndLimits(); nightAndPlan(); ticksAndReconnect(); setupAndLoop(); watchdog();
   std::printf("PASS: %d assertions; calendar, GPIO, limits, retry and production setup/loop\n",checks);
 }

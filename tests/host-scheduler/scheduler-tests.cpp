@@ -235,6 +235,8 @@ static void pumpController() {
   hRelayOutputs outputs(gpio, pins);
   CHECK(outputs.begin());
   hConfigurator config(&outputs);
+  thermoClientStat thermostat; thermostat.ID = 1; thermostat.serialChip = 1001;
+  CHECK(config.registerClient(thermostat)); CHECK(config.recordContact(1,1001,true));
   hPumpsController controller(&scheduler, &config);
   failNextAllocation = true;
   CHECK(!controller.turnOnHeatPumpReq(1, 18, 21));

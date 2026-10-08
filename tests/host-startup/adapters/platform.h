@@ -120,7 +120,14 @@ struct FakeWiFi {
   bool softAP(const char *, const char *, int, bool, int) { return true; }
 };
 struct FakeSerial {
+  std::vector<std::string> contactEvents;
+  std::string prefix;
   void begin(int) {}
+  void print(const char *text) { prefix = text; }
+  void println(int id) {
+    if (prefix.find("Thermostat contact") == 0) contactEvents.push_back(prefix + std::to_string(id));
+    prefix.clear();
+  }
   template<class T> void print(const T &) {}
   template<class T> void println(const T &) {}
 };

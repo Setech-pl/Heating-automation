@@ -160,6 +160,19 @@ bool readTemperature(JsonVariant value, float &result)
   result = parsed;
   return true;
 }
+
+bool readSerial(JsonVariant value, uint32_t &result)
+{
+  const char *text = numberText(value);
+  if (!text || !*text || std::strlen(text) > 10) return false;
+  for (const char *p = text; *p; ++p) if (*p < '0' || *p > '9') return false;
+  errno = 0;
+  char *end = nullptr;
+  unsigned long parsed = std::strtoul(text, &end, 10);
+  if (errno == ERANGE || *end || parsed == 0 || parsed > UINT32_MAX) return false;
+  result = static_cast<uint32_t>(parsed);
+  return true;
+}
 }
 
 UDPMessengerService::UDPMessengerService(uint16_t port)
@@ -226,11 +239,18 @@ void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort
   tClientCommand command = {};
   if (!cmd || std::strlen(cmd) >= sizeof(command.cmd) ||
       (std::strcmp(cmd, "ON") != 0 && std::strcmp(cmd, "OFF") != 0 &&
+       std::strcmp(cmd, "HEARTBEAT") != 0 &&
        std::strcmp(cmd, "SHOWSERVER") != 0 && std::strcmp(cmd, "SHOWSTATUS") != 0) ||
       !readID(root["ID"], command.ID) ||
       !readTemperature(root["actualTEMP"], command.actualTEMP) ||
       !readTemperature(root["targetTEMP"], command.targetTEMP)) return;
   std::memcpy(command.cmd, cmd, std::strlen(cmd) + 1);
+  if (root.containsKey("serial")) {
+    if (!readSerial(root["serial"], command.serial)) return;
+    std::snprintf(command.serialID, sizeof(command.serialID), "%lu", static_cast<unsigned long>(command.serial));
+  }
+  if (std::strcmp(cmd, "HEARTBEAT") == 0 &&
+      (command.serial == 0 || command.ID < 1 || command.ID > 4)) return;
 
   // Publish only a fully validated, owned value. Rejections preserve both a
   // pending command and its reply address; no pointer escapes the JSON buffer.

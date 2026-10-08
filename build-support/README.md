@@ -1,6 +1,8 @@
-# Kompilacja centrali na macOS ARM64
+# Controller build on macOS ARM64
 
-W katalogu głównym produktu:
+[Polski](README.pl.md) | English | [Project README](../README.md)
+
+From the repository root:
 
 ```sh
 python3 scripts/b0-prepare.py
@@ -9,48 +11,61 @@ python3 scripts/test-host-udp.py
 python3 scripts/test-host-udp.py --sanitize
 ```
 
-Wymagania: macOS ARM64, Python ≥3.9, Git, GitHub CLI (`gh`) z dostępem do
-publicznych wydań, BSD tar, `make` i dostępny `/usr/bin/clang` z macOS SDK.
-Pierwsze przygotowanie wymaga sieci; kolejne używa pobranych archiwów
-i checkoutów. Kompilacja korzysta z lokalnych zależności.
+Requirements: macOS ARM64, Python ≥3.9, Git, GitHub CLI (`gh`) with access to
+public releases, BSD tar, `make` and available `/usr/bin/clang` with the macOS
+SDK. Initial preparation needs network access; subsequent preparation reuses
+downloaded archives and checkouts. Compilation uses local dependencies.
 
-Manifest [b0-lock.json](b0-lock.json) przypina wersje, SHA-256 archiwów
-i commity bibliotek. Narzędzia i zależności trafiają do ignorowanego
-`.arduino/`. Skrypty nie instalują globalnych narzędzi.
+[b0-lock.json](b0-lock.json) pins versions, archive SHA-256 values and library
+commits. Tools and dependencies go to ignored `.arduino/`. The scripts do not
+install global tools.
 
 - [ESP8266 core 3.1.2](https://github.com/esp8266/Arduino/releases/tag/3.1.2)
-  korzysta z GCC 10.3. Natywny pakiet ARM64 pochodzi z
+  uses GCC 10.3. The native ARM64 package is
   [ESPHome 10.3.0-esphome.2](https://github.com/esphome-libs/xtensa-lx106-elf-toolchain/releases/tag/10.3.0-esphome.2).
-  Nazwa katalogu narzędzia odpowiada zależności core, a rzeczywiste wydanie
-  i suma pakietu są jawne w manifeście.
-- Arduino CLI 1.3.1 pozostaje przypięte. ctags 5.8-arduino11 jest budowany
-  z [oficjalnych źródeł Arduino](https://github.com/arduino/ctags/releases/tag/5.8-arduino11)
-  przez Clang. Skrypt zmienia nazwę makra `__unused__`, które koliduje
-  z obecnym macOS SDK; nie zmienia parsera ctags.
-- ArduinoJson 5.13.5, PubSubClient 2.7, NTPClient 3.2.0, Time 1.5 i vendored
-  LiquidCrystal_I2C 1.1.4 zachowują wersje. Zweryfikowany checkout Time
-  pozostaje w `.arduino/sources/Time`; jego kopia do kompilacji pomija tylko
-  przestarzały wrapper `Time.h`, kolidujący z systemowym `time.h` na macOS.
-  Źródła korzystają z `TimeLib.h`; kopie `Time.cpp` i `DateStrings.cpp` również
-  używają tej nazwy zamiast wrappera. Logika biblioteki nie jest zmieniana.
-- Launcher Python core wskazuje istniejący interpreter użyty do przygotowania.
-  Jego ścieżka i wersja są zapisane w `.arduino/prepared.json`. Zmiana manifestu
-  wymaga ponownego przygotowania przed buildem.
+  The tool directory name matches the core dependency;
+  the actual release and package checksum are explicit in the manifest.
+- Arduino CLI 1.3.1 is pinned. ctags 5.8-arduino11 is built from
+  [official Arduino sources](https://github.com/arduino/ctags/releases/tag/5.8-arduino11)
+  with Clang. Preparation renames the `__unused__` macro
+  that conflicts with the macOS SDK; it does not change the ctags parser.
+- ArduinoJson 5.13.5, PubSubClient 2.7, NTPClient 3.2.0, Time 1.5 and vendored
+  LiquidCrystal_I2C 1.1.4 retain their versions. The verified Time checkout
+  stays in `.arduino/sources/Time`; its compilation copy omits the obsolete
+  `Time.h` wrapper, which conflicts with system `time.h` on macOS.
+  Sources use `TimeLib.h`; copies of `Time.cpp` and `DateStrings.cpp`
+  also use that header instead of the wrapper. Library logic is unchanged.
+- The core's Python launcher selects the interpreter used during preparation.
+  Its path and version are recorded in `.arduino/prepared.json`. Changing
+  the manifest requires preparation again before a build.
 
-Build kopiuje śledzone pliki centrali do `build/b0/sketch/heating_server`.
-Domyślnie używa wyłącznie przykładów sekretów i przekaźników.
-Nie czyta lokalnych sekretów. Opcja `--local-config` jawnie wybiera lokalne,
-ignorowane `heating_server/secrets.h` i `relay_config.h`; służy do przygotowania
-obrazu po uzupełnieniu własnej konfiguracji opisanej w [README](../README.md).
-Skrypt wykonuje czystą kompilację, zapisując komendę
-w `build/b0/command.json`, log wraz z rozmiarami w `build/b0/compile.log`,
-a ELF/BIN w `build/b0/output/`. Build przekazuje `MQTT_SOCKET_TIMEOUT=1`
-do kompilacji całego szkicu i PubSubClient; wersja biblioteki pozostaje 2.7.
-Testy wszystkich modułów opisano w [README](../README.md). Testy UDP opisano w
+The build copies tracked controller files into `build/b0/sketch/heating_server`.
+By default it uses only credential and relay examples and does not read local
+credentials. `--local-config` explicitly selects the ignored local
+`heating_server/secrets.h` and `relay_config.h` for an image using the owner's
+configuration described in the [README](../README.md).
+
+The script performs a clean compilation, saving the command in
+`build/b0/command.json`, the log and memory sizes in `build/b0/compile.log`,
+and ELF/BIN in `build/b0/output/`. It passes `MQTT_SOCKET_TIMEOUT=1` to the
+entire sketch and PubSubClient; the library remains at 2.7. This is an MQTT
+response timeout, not a thermostat-loss timeout. All module tests are described
+in the [README](../README.md), with UDP details in
 [tests/host-udp/README.md](../tests/host-udp/README.md).
 
-Opcje profilu generic, w tym 512 KB flash, pozostają historyczne i nie
-potwierdzają konfiguracji płytki. Ten target przygotowuje obraz firmware;
-narzędzia obrazów systemów plików i uploadu nie są instalowane. Nie flashuje
-sprzętu ani nie testuje fizycznych wyjść. Źródła termostatów nie są częścią
-tego targetu.
+The generic profile, including 512 KB flash, comes from the existing
+compilation configuration and does not establish the physical board model.
+This target prepares a firmware image; filesystem-image and upload tools
+are not installed. It does not upload firmware or test physical outputs.
+Thermostat sources are not part of this target.
+
+## Communication compatibility
+
+Controller 0.3.0 compiles HEARTBEAT reception and the 180 s timeout. The client
+contract requires a heartbeat every 60 s, including without heating, and
+`serial` matching `HEATING_THERMOSTAT_SERIALS` in local `relay_config.h`.
+When updating earlier configuration, add this array and preserve other settings.
+The default build uses zero assignments and cannot start CO.
+No thermostat firmware target is available; its build, heartbeat transmission
+and reconnect behavior remain BLOCKED because sources are absent. The update
+procedure and requirements for both sides are in the [README](../README.md).

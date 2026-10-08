@@ -16,7 +16,7 @@
 #define _MQTT_SENSORS_TOPIC "heating/sensors"
 #include "secrets.h"
 
-#define _SERVER_VERSION "Heating server 0.2.3 "
+#define _SERVER_VERSION "Heating server 0.3.0 "
 const bool _INTERNAL_WIFI_MODE = false;
 
 //heating & domestic pumps management
@@ -28,6 +28,8 @@ const bool _INTERNAL_WIFI_MODE = false;
 #define _MAX_HEATING_INTERIOR_TEMP 28
 #define _MAX_HEATING_TEMP_DELTA 0.7
 #define _MAX_HEATING_PUMPS_NO 4
+#define _THERMOSTAT_HEARTBEAT_MS 60000UL
+#define _THERMOSTAT_TIMEOUT_MS 180000UL
 #define _MAX_DAY_OVERHEATING 1
 #define _MAX_NIGHT_COOLING -2
 #define _MAX_HEATING_PUMP_RUNNING_MINUTES 7720
@@ -56,10 +58,10 @@ struct pumpStatus
 
 struct thermoClientStat
 {
-	int ID;
-	long int serialChip = 0;
-	char version[5];
-	char IP[16];
+	int ID = 0;
+	uint32_t serialChip = 0;
+	char version[5] = {};
+	char IP[16] = {};
 };
 
 class hConfigurator
@@ -76,6 +78,13 @@ public:
 	bool holidayPlan = false;
 	bool manualCirculationEnabled = false;
 	bool registerClient(thermoClientStat client);
+	bool recordContact(int pumpNumber, uint32_t serial, bool newOn);
+	bool expireContact(int pumpNumber);
+	bool heatingAllowed(int pumpNumber);
+	uint32_t requestGeneration(int pumpNumber) const;
+	void revokeHeating(int pumpNumber);
+	bool safetyStopRequired(int pumpNumber) const;
+	void completeSafetyStop(int pumpNumber);
 	void setMQTTStatus(bool mqttStatus);
 	bool getMQTTStatus();
 	explicit hConfigurator(hRelayOutputs *outputs = nullptr);
@@ -98,7 +107,12 @@ private:
 	uint64_t _uptime = 0;
 	uint32_t _lastMillis;
 	bool mqttStatus = false;
-	//thermoClientStat _clients[4];
+	struct Contact {
+		uint32_t serial = 0, generation = 0;
+		uint64_t last = 0;
+		bool seen = false, lost = false, allowOn = false, stopRequired = false;
+	};
+	Contact _clients[_MAX_HEATING_PUMPS_NO] = {};
 	int _pumpsHistoryC = 0;
 	void saveHistory(int pumpNumber, bool on, uint64_t timestamp);
 };
