@@ -16,10 +16,19 @@
 #endif
 
 void hScreen::printStatusBar(const char Msg[]){
-  strcpy(this->lines[3],_BLANK_LINE);                        
-  strcpy(this->lines[3],Msg); 
+  // LCD text may be clipped and padded; MQTT topics must never be clipped.
+  snprintf(this->lines[3], sizeof(this->lines[3]), "%-20.20s", Msg);
 }
 
+void hScreen::printNetworkStatus(bool internalWiFiMode)
+{
+  char text[sizeof(" IP : ") + sizeof("255.255.255.255") - 1];
+  IPAddress address = internalWiFiMode ? WiFi.softAPIP() : WiFi.localIP();
+  snprintf(text, sizeof(text), " IP : %u.%u.%u.%u",
+           static_cast<unsigned>(address[0]), static_cast<unsigned>(address[1]),
+           static_cast<unsigned>(address[2]), static_cast<unsigned>(address[3]));
+  printStatusBar(text);
+}
 
 
 
@@ -65,10 +74,10 @@ void hScreen::noBackLight()
 hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
   _config = config;
   _lcd=lcd;
-  for (int i=0; i<4; i++){
-    strcpy(this->lines[i],"");
-  }
-  _clearScreen = false;
+  memset(this->lines, 0, sizeof(this->lines));
+  memset(this->_lines, 0, sizeof(this->_lines));
+  for (int i=0; i<4; i++) strcpy(this->lines[i], _BLANK_LINE);
+  _clearScreen = true; // First render writes all rows, including empty rows.
 };
 
 void hScreen::printSplashScreen(){
@@ -110,8 +119,7 @@ void hScreen::printMenu()
 		strcpy(this->lines[1], hr);
 		sprintf(hr, " RSSI :%03d%%", signalQuality);
 		strcpy(this->lines[2], hr);
-    sprintf(hr," IP : %d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);    
-    strcpy(this->lines[3], hr);    
+    printNetworkStatus(false);
 		break;
 	case 3:
 		strcpy(this->lines[0], " MENU> SCHEDULER  ");

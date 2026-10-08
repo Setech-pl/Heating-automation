@@ -2,6 +2,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "utils.h"
 #include "heating_config.h"
+#include "screen.h"
+#include <stdio.h>
 #include  <string.h>
 #ifndef _CPPWIN
   #include <ESP8266WiFi.h>
@@ -16,6 +18,44 @@
 Utility commands
 */
 
+bool formatThermostatTopic(char *topic, size_t capacity, int id)
+{
+  if (topic == NULL || capacity == 0) return false;
+  topic[0] = '\0';
+  // Match the existing controller's heating-pump domain; no protocol migration.
+  if (id < 1 || id > _MAX_HEATING_PUMPS_NO) return false;
+  int length = snprintf(topic, capacity, "%s/thermostat%d", _MQTT_SENSORS_TOPIC, id);
+  if (length < 0 || static_cast<size_t>(length) >= capacity) {
+    topic[0] = '\0'; // Never expose a truncated topic as usable.
+    return false;
+  }
+  return true;
+}
+
+ntp_update::StartupResult ntp_update::synchronizeOnStartup(bool internalWiFiMode,
+                                                         hScreen &display)
+{
+  StartupResult state = skipped;
+  strcpy(result, "NTP skipped (AP)");
+  if (!internalWiFiMode) {
+    state = failed;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+      char progress[21];
+      snprintf(progress, sizeof(progress), "Updating NTP(%d)  ", attempt);
+      display.printStatusBar(progress);
+      display.renderScreen();
+      bool success = execute();
+      delay(300);
+      if (success) {
+        state = synchronized;
+        break;
+      }
+    }
+  }
+  display.printStatusBar(result);
+  display.renderScreen();
+  return state;
+}
 
 bool ntp_update::execute(){
      WiFiUDP ntpUDP;    
@@ -28,7 +68,7 @@ bool ntp_update::execute(){
       setTime(timeClient.getEpochTime());
       return true;
     }else {
-      strcpy(this->result,"NPT update ERROR  ");
+      strcpy(this->result,"NTP update ERROR  ");
       return false;
     }
 

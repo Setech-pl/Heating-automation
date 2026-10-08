@@ -77,7 +77,7 @@ void setup()
   int counter = 0;
   bool wynik = false;
   char temp[21];
-  tm t;
+  tm t = {};
   connect_external_wifi connExternalWiFi(true, t, hourly, 0);
   ntp_update ntpUpdateCommand(true, t, hourly, 0);
   lcd.init();
@@ -112,35 +112,13 @@ void setup()
       delay(200);
     }
   }
-  counter = 0;
-  wynik = false;
   //Updating time from NTP time server
-  while (!wynik && counter && !internalWIFIMode< 5)
-  {
-    ;
-    sprintf(temp, "Updating NTP(%d)  ", counter);
-    hdisplay->printStatusBar(temp);
-    hdisplay->renderScreen();
-    counter++;
-    wynik = ntpUpdateCommand.execute();
-    delay(300);
-  }
-  hdisplay->printStatusBar(ntpUpdateCommand.result);
-  hdisplay->renderScreen();
+  ntpUpdateCommand.synchronizeOnStartup(internalWIFIMode, *hdisplay);
   delay(1000);
   // if _INTERNAL_WIFI_MODE == true then enable internal wifi
 
   hook_discover_devices();
-  char hr[21];
-  if (!internalWIFIMode)
-  {
-    sprintf(hr, " IP : %d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  }
-  else
-  {
-    sprintf(hr, " IP : %d.%d.%d.%d", WiFi.softAPIP()[0], WiFi.softAPIP()[1], WiFi.softAPIP()[2], WiFi.softAPIP()[3]);
-  }
-  hdisplay->printStatusBar(hr);
+  hdisplay->printNetworkStatus(internalWIFIMode);
   hdisplay->renderScreen();
   delay(1000);
   timeMillis = 0;
@@ -238,9 +216,10 @@ void loop()
       udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
       if (config->getMQTTStatus())
       {
-        char subtopic[16];
-        sprintf(subtopic, "%s/%s%d", _MQTT_SENSORS_TOPIC, "thermostat", temp.ID);
-        Serial.println(subtopic);
+        char subtopic[THERMOSTAT_TOPIC_CAPACITY];
+        if (formatThermostatTopic(subtopic, sizeof(subtopic), temp.ID)) {
+          Serial.println(subtopic);
+        }
         // client.publish(#_MQTT_SENSORS_TOPIC "/" , hr);
       }
     }

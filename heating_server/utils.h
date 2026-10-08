@@ -1,5 +1,13 @@
 #pragma once
 #include "scheduler.h"
+#include <stddef.h>
+
+class hScreen;
+
+// Prefix, separator/name, longest decimal int (including sign), and NUL.
+const size_t THERMOSTAT_TOPIC_CAPACITY =
+    sizeof(_MQTT_SENSORS_TOPIC) + sizeof("/thermostat") - 1 + sizeof(int) * 3;
+bool formatThermostatTopic(char *topic, size_t capacity, int id);
 /*
 Utility commands
 */
@@ -7,6 +15,8 @@ Utility commands
 
 class ntp_update : public hCommand {
   public:
+    enum StartupResult { skipped, synchronized, failed };
+    StartupResult synchronizeOnStartup(bool internalWiFiMode, hScreen &display);
     bool execute();
     ntp_update(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 

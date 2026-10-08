@@ -22,7 +22,7 @@ public:
 	tm scheduleTime;
 	escheduleType scheduleType;
 	int payload;
-	char result[21];
+	char result[21] = {};
 
 protected:
 	void (*_callbackFunction)();

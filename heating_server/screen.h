@@ -18,6 +18,7 @@ class hScreen
 public:
 	hScreen(LiquidCrystal_I2C *lcd, hConfigurator *config);
 	void printStatusBar(const char Msg[]);
+	void printNetworkStatus(bool internalWiFiMode);
 	void printMainScreen();
 	void printSplashScreen();
 	void printMenu();
