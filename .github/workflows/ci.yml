@@ -1,0 +1,108 @@
+name: Heating Automation CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Prepare pinned dependencies
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/b0-prepare.py
+
+      - name: Host tests
+        id: normal
+        run: |
+          mkdir -p build/ci
+          result=0
+          for target in udp startup scheduler runtime; do
+            if python3 "scripts/test-host-${target}.py"; then
+              printf '| %s | normal | PASS |\n' "$target" >> build/ci/host-normal.md
+            else
+              printf '| %s | normal | FAIL |\n' "$target" >> build/ci/host-normal.md
+              result=1
+            fi
+          done
+          exit "$result"
+
+      - name: Host tests with ASan and UBSan
+        id: sanitize
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        run: |
+          mkdir -p build/ci
+          result=0
+          for target in udp startup scheduler runtime; do
+            if python3 "scripts/test-host-${target}.py" --sanitize; then
+              printf '| %s | ASan/UBSan | PASS |\n' "$target" >> build/ci/host-sanitize.md
+            else
+              printf '| %s | ASan/UBSan | FAIL |\n' "$target" >> build/ci/host-sanitize.md
+              result=1
+            fi
+          done
+          exit "$result"
+
+      - name: Build server with example configuration
+        id: firmware
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        run: |
+          python3 scripts/b0-build.py
+          test -s build/b0/output/heating_server.ino.bin
+          test -s build/b0/output/heating_server.ino.elf
+
+      - name: Results and firmware sizes
+        if: ${{ always() }}
+        env:
+          PREPARE_RESULT: ${{ steps.prepare.outcome }}
+          NORMAL_RESULT: ${{ steps.normal.outcome }}
+          SANITIZE_RESULT: ${{ steps.sanitize.outcome }}
+          FIRMWARE_RESULT: ${{ steps.firmware.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          labels = {'success': 'PASS', 'failure': 'FAIL', 'skipped': 'NOT RUN', 'cancelled': 'CANCELLED'}
+          lines = ['## Heating Automation CI', '', '| Check | Result |', '| --- | --- |']
+          for name in ('prepare', 'normal', 'sanitize', 'firmware'):
+              outcome = os.environ[name.upper() + '_RESULT']
+              lines.append(f'| {name} | {labels.get(outcome, "NOT RUN")} |')
+          lines += ['', '| Host target | Mode | Result |', '| --- | --- | --- |']
+          for name in ('normal', 'sanitize'):
+              report = Path(f'build/ci/host-{name}.md')
+              if report.is_file():
+                  lines.extend(report.read_text().splitlines())
+          lines += ['', '### Firmware (example configuration)', '']
+          log = Path('build/b0/compile.log')
+          if os.environ['FIRMWARE_RESULT'] == 'success' and log.is_file():
+              sizes = [line for line in log.read_text().splitlines() if line.startswith('. ')]
+              lines += ['```text', *sizes]
+              for binary in sorted(Path('build/b0/output').glob('*.bin')):
+                  lines.append(f'{binary.name}: {binary.stat().st_size} bytes')
+              lines.append('```')
+          else:
+              lines.append('Sizes unavailable; see the build step log.')
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write('\n'.join(lines) + '\n')
+          PY

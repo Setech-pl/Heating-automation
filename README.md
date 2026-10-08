@@ -1,5 +1,7 @@
 # Heating Automation
 
+[![CI](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml)
+
 Centrala ESP8266 odbiera żądania termostatów przez UDP i steruje czterema
 pompami CO oraz pompą obiegową CWU. Kod centrali znajduje się w
 `heating_server/`. Źródła i build firmware termostatów nie zostały odnalezione;
@@ -9,7 +11,8 @@ rootowe projekty Windows są osobnymi, historycznymi programami hostowymi.
 
 Wymagane: macOS ARM64, Python ≥3.9, Git, GitHub CLI `gh`, `make`, BSD tar
 oraz Clang z macOS SDK. Narzędzia i przypięte zależności instalują się lokalnie
-w ignorowanym `.arduino/`, bez zmiany globalnego toolchaina.
+w ignorowanym `.arduino/`, bez zmiany globalnego toolchaina. Aktualny obraz
+budujemy ze źródeł przy użyciu skryptów i manifestu `build-support/b0-lock.json`:
 
 ```sh
 python3 scripts/b0-prepare.py
@@ -25,6 +28,24 @@ przekaźników. ELF/BIN trafiają do `build/b0/output/`, a log i rozmiary do
 `build/b0/compile.log`. Skrypt nie flashuje urządzenia. Profil generic ESP8266
 z flash 512 KB jest historycznym profilem kompilacji; trzeba porównać go
 z rzeczywistym modułem przed przygotowaniem obrazu dla płytki.
+
+## CI
+
+[GitHub Actions](https://github.com/Setech-pl/Heating-automation/actions/workflows/ci.yml)
+uruchamia się na push, pull request i ręcznie przez `workflow_dispatch`.
+Jeden job na macOS 15 ARM64 przygotowuje przypięte zależności istniejącym
+skryptem, uruchamia wszystkie cztery targety hostowe normalnie i z ASan/UBSan
+oraz buduje centralę z przykładową konfiguracją. Podsumowanie wykonania zawiera
+wyniki targetów, zużycie RAM/IRAM/flash i rozmiar BIN; szczegółowy log kompilacji
+znajduje się w `build/b0/compile.log` na runnerze. CI ma tylko `contents: read`,
+a publiczne wydania pobiera przez standardowy token workflow przekazany jako
+`GH_TOKEN`. Oficjalne akcje są przypięte pełnymi SHA. Nie używa PAT ani sekretów
+właściciela i nie flashuje urządzenia.
+
+Stary eksport `heating_server.ino.generic.bin`, baza Visual Studio `.VC.db`
+i ustawienia użytkownika `.vcxproj.user` są wygenerowanymi artefaktami;
+nie są wejściami obecnego builda i pozostają ignorowane. Źródła, rozwiązania
+Windows `.sln`, projekty `.vcxproj` i ich filtry pozostają w repozytorium.
 
 ## Testy
 

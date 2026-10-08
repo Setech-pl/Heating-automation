@@ -12,3 +12,8 @@ Debug/
 .vs/
 
 heating_server/relay_config.h
+
+# Generated firmware export and Visual Studio local state.
+/heating_server/heating_server.ino.generic.bin
+/TEST_HEATING_SERVER.VC.db
+*.vcxproj.user
