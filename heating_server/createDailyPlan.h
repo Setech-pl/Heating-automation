@@ -1,4 +1,4 @@
 #pragma once
 
 
-void createDailyPlan(hPumpsController *heatPumpController);
+bool createPlanForDomesticWaterPump(hPumpsController *heatPumpController);

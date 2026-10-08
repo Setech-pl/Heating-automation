@@ -63,7 +63,11 @@ struct FakeSerial
   template<class T> void print(const T &) {}
 };
 struct FakeESP { unsigned getChipId() { return 123; } };
-struct FakeWiFi { IPAddress localIP() { return IPAddress(); } };
+struct FakeWiFi {
+  IPAddress station, accessPoint = IPAddress(192,168,4,1);
+  IPAddress localIP() { return station; }
+  IPAddress softAPIP() { return accessPoint; }
+};
 extern FakeSerial Serial;
 extern FakeESP ESP;
 extern FakeWiFi WiFi;

@@ -10,3 +10,5 @@ __pycache__/
 *.log
 Debug/
 .vs/
+
+heating_server/relay_config.h

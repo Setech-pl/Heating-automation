@@ -58,6 +58,7 @@ ntp_update::StartupResult ntp_update::synchronizeOnStartup(bool internalWiFiMode
 }
 
 bool ntp_update::execute(){
+     if (WiFi.status() != WL_CONNECTED) { strcpy(result, "NTP offline"); return false; }
      WiFiUDP ntpUDP;    
      NTPClient timeClient(ntpUDP, "0.pl.pool.ntp.org", 3600, 60000);
 		

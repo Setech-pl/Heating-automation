@@ -1,4 +1,3 @@
-#pragma once
 #include "udpmessengerservice.h"
 #include <ArduinoJson.h>
 #include <TimeLib.h>
@@ -8,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 
 namespace
 {
@@ -164,7 +164,6 @@ bool readTemperature(JsonVariant value, float &result)
 
 UDPMessengerService::UDPMessengerService(uint16_t port)
 {
-  _udp.begin(port);
   _listenPort = port;
 }
 
@@ -182,6 +181,17 @@ void UDPMessengerService::listen()
   }
 }
 
+void UDPMessengerService::begin(bool internalWiFiMode)
+{
+  _internalWiFiMode = internalWiFiMode;
+  _udp.begin(_listenPort);
+}
+
+IPAddress UDPMessengerService::activeIP() const
+{
+  return _internalWiFiMode ? WiFi.softAPIP() : WiFi.localIP();
+}
+
 void UDPMessengerService::getDeviceInfo(JsonObject &result)
 {
   result["serialNumber"] = ESP.getChipId();
@@ -196,7 +206,7 @@ void UDPMessengerService::sendPacket(IPAddress ip, bool broadcast, uint16_t port
   }
   else
   {
-    _udp.beginPacketMulticast(ip, port, WiFi.localIP());
+    _udp.beginPacket(ip, port); // Subnet broadcast uses the active Wi-Fi interface.
   }
   _udp.write(content);
   _udp.endPacket();
@@ -232,7 +242,7 @@ void UDPMessengerService::processMessage(IPAddress senderIp, uint16_t senderPort
 
 //Now i have to send back OK or NO message
 
-void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
+void UDPMessengerService::sendBackMessage(bool status, bool runningStatus, const char *outputState)
 {
   char resultBuffer[_MAX_PACKET_SIZE] = "";
   StaticJsonBuffer<_MAX_PACKET_SIZE> jsonBuffer;
@@ -253,10 +263,12 @@ void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
   {
     backmsg["RUNNING"] = "NO";
   }
+  if (outputState != nullptr) backmsg["OUTPUT"] = outputState;
   char hr[21];
-  sprintf(hr, "%d", now());
+  snprintf(hr, sizeof(hr), "%llu", static_cast<unsigned long long>(now()));
   backmsg["TIME"] = hr;
-  sprintf(hr, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  IPAddress address = activeIP();
+  snprintf(hr, sizeof(hr), "%u.%u.%u.%u", unsigned(address[0]), unsigned(address[1]), unsigned(address[2]), unsigned(address[3]));
   backmsg["SERVERIP"] = hr;
   backmsg.printTo(resultBuffer, _MAX_PACKET_SIZE);
   Serial.println("sendBackMessage");
@@ -266,16 +278,17 @@ void UDPMessengerService::sendBackMessage(bool status, bool runningStatus)
 
 void UDPMessengerService::discoverDevices()
 {
-  IPAddress broadcastIP = WiFi.localIP();
+  IPAddress broadcastIP = activeIP();
   char hr[21];
   char resultBuffer[_MAX_PACKET_SIZE] = "";
-  sprintf(hr, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  IPAddress address = activeIP();
+  snprintf(hr, sizeof(hr), "%u.%u.%u.%u", unsigned(address[0]), unsigned(address[1]), unsigned(address[2]), unsigned(address[3]));
   broadcastIP[3] = 255;
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject &result = jsonBuffer.createObject();
   result["cmd"] = "SHOW";
   result["SERVERIP"] = hr;
-  sprintf(hr, "%d", now());
+  snprintf(hr, sizeof(hr), "%llu", static_cast<unsigned long long>(now()));
   result["TIME"] = hr;
   result.printTo(resultBuffer, _MAX_PACKET_SIZE);
   sendPacket(broadcastIP, true, _listenPort, resultBuffer);
@@ -298,19 +311,21 @@ bool UDPMessengerService::checkNewCommand()
 
 void UDPMessengerService::setTempFromMQTT(tClientCommand mqttCommand)
 {
-  IPAddress broadcastIP = WiFi.localIP();
+  if (mqttCommand.ID < 1 || mqttCommand.ID > 4 || !std::isfinite(mqttCommand.targetTEMP)) return;
+  IPAddress broadcastIP = activeIP();
   char hr[21];
   char resultBuffer[_MAX_PACKET_SIZE] = "";
-  sprintf(hr, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  IPAddress address = activeIP();
+  snprintf(hr, sizeof(hr), "%u.%u.%u.%u", unsigned(address[0]), unsigned(address[1]), unsigned(address[2]), unsigned(address[3]));
   broadcastIP[3] = 255;
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject &result = jsonBuffer.createObject();
   result["cmd"] = "MQTTSET";
   result["ID"] = mqttCommand.ID;
   result["SERVERIP"] = hr;
-  sprintf(hr, "%d", now());
+  snprintf(hr, sizeof(hr), "%llu", static_cast<unsigned long long>(now()));
   result["TIME"] = hr;
-  sprintf(hr,  "%f", mqttCommand.targetTEMP);
+  snprintf(hr, sizeof(hr), "%.9g", static_cast<double>(mqttCommand.targetTEMP));
   result["targetTEMP"] = hr;
   result.printTo(resultBuffer, _MAX_PACKET_SIZE);
   sendPacket(broadcastIP, true, _listenPort, resultBuffer);

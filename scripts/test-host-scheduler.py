@@ -24,7 +24,7 @@ def main():
     output = ROOT / "build/host-scheduler" / ("sanitize" if args.sanitize else "normal")
     source = output / "source"
     source.mkdir(parents=True, exist_ok=True)
-    for module in ("scheduler", "heating_config"):
+    for module in ("scheduler", "heating_config", "relay_output", "createDailyPlan"):
         for suffix in (".cpp", ".h"):
             shutil.copy2(ROOT / "heating_server" / (module + suffix), source)
     shutil.copy2(ROOT / "heating_server/secrets.example.h", source / "secrets.h")
@@ -45,7 +45,8 @@ def main():
          str(ROOT / "tests/host-scheduler/scheduler-tests.cpp"), "-o", str(tests)])
     binary = output / "scheduler-tests"
     run([compiler, *flags, str(tests), str(scheduler),
-         str(source / "heating_config.cpp"), "-o", str(binary)])
+         str(source / "heating_config.cpp"), str(source / "relay_output.cpp"),
+         str(source / "createDailyPlan.cpp"), "-o", str(binary)])
     environment = os.environ.copy()
     if args.sanitize:
         environment["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"

@@ -230,14 +230,18 @@ static void callbackRemoval() {
 
 static void pumpController() {
   hScheduler scheduler;
-  hConfigurator config;
+  hArduinoGpio gpio;
+  const hRelayPin pins[5] = {{0,1}, {2,0}, {12,1}, {13,0}, {14,1}}; // Host fixture, no hardware mapping.
+  hRelayOutputs outputs(gpio, pins);
+  CHECK(outputs.begin());
+  hConfigurator config(&outputs);
   hPumpsController controller(&scheduler, &config);
   failNextAllocation = true;
   CHECK(!controller.turnOnHeatPumpReq(1, 18, 21));
   CHECK(!failNextAllocation);
   CHECK(!config.getPumpStatus(1));
   CHECK(scheduler.activeTaskCount() == 0);
-  CHECK(scheduler.addTask(new hPumpCommand(true, dueTime(), hourly, 1)) == 0);
+  CHECK(scheduler.addTask(new hPumpCommand(true, dueTime(), hourly, 1, &config)) == 0);
   CHECK(!controller.turnOnHeatPumpReq(1, 18, 21));
   CHECK(!config.getPumpStatus(1));
   CHECK(scheduler.activeTaskCount() == 1);
@@ -252,6 +256,7 @@ static void pumpController() {
   CHECK(config.getPumpStatus(1));
   CHECK(scheduler.activeTaskCount() == 511);
   CHECK(executions == runs);
+  platform.milliseconds += 120000;
   fakeMinute += 2; // Existing minimum ON/OFF interval, without wall-clock time.
   CHECK(scheduler.addTask(new Probe(false, 9999)) == 511);
   CHECK(!controller.turnOffHeatPumpReq(1, 18, 21));

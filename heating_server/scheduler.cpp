@@ -2,6 +2,8 @@
 #include "scheduler.h"
 #include <time.h>
 #include <new>
+#include <math.h>
+#include "createDailyPlan.h"
 #ifndef _CPPWIN
 #include <TimeLib.h>
 #endif // !_CPPWIN
@@ -37,6 +39,10 @@ int hScheduler::addTask(hCommand *command)
 	for (int i = 0; i < commandCounter; ++i)
 		if (commands[i] == command)
 			return duplicate;
+	if (!validSchedule(*command)) {
+		delete command;
+		return invalidTask;
+	}
 	if (findDuplicate(command))
 	{
 		delete command;
@@ -49,6 +55,10 @@ int hScheduler::addTask(hCommand *command)
 		return full;
 	}
 	commands[slot] = command;
+	if (timeStatus() != timeNotSet) {
+		time_t current = now();
+		initializeSchedule(*command, current);
+	}
 	return slot;
 }
 
@@ -154,82 +164,97 @@ int hScheduler::getFreeSlot()
 	return full;
 }
 
-//checking command validation
+bool hScheduler::validSchedule(const hCommand &command) const
+{
+	const tm &time = command.scheduleTime;
+	return command.scheduleType >= daily && command.scheduleType <= monthly &&
+		time.tm_hour >= 0 && time.tm_hour <= 23 && time.tm_min >= 0 && time.tm_min <= 59 &&
+		time.tm_sec >= 0 && time.tm_sec <= 59 &&
+		(command.scheduleType != weekly || (time.tm_wday >= 1 && time.tm_wday <= 7)) &&
+		(command.scheduleType != monthly || (time.tm_mday >= 1 && time.tm_mday <= 31));
+}
+
+time_t hScheduler::nextOccurrence(const hCommand &command, time_t after) const
+{
+	const tm &time = command.scheduleTime;
+	time_t midnight = (after / SECS_PER_DAY) * SECS_PER_DAY;
+	time_t target = midnight + time.tm_hour * SECS_PER_HOUR + time.tm_min * SECS_PER_MIN + time.tm_sec;
+	switch (command.scheduleType) {
+	case minutly:
+		target = (after / SECS_PER_MIN) * SECS_PER_MIN + time.tm_sec;
+		return target < after ? target + SECS_PER_MIN : target;
+	case hourly:
+		target = (after / SECS_PER_HOUR) * SECS_PER_HOUR + time.tm_min * SECS_PER_MIN + time.tm_sec;
+		return target < after ? target + SECS_PER_HOUR : target;
+	case daily:
+		return target < after ? target + SECS_PER_DAY : target;
+	case weekly:
+		target += ((time.tm_wday - weekday(after) + 7) % 7) * SECS_PER_DAY;
+		return target < after ? target + SECS_PER_WEEK : target;
+	case monthly: {
+		tmElements_t parts;
+		breakTime(after, parts);
+		parts.Hour = time.tm_hour;
+		parts.Minute = time.tm_min;
+		parts.Second = time.tm_sec;
+		parts.Day = time.tm_mday;
+		// Skip months without the requested day; never normalize 31 February.
+		for (int monthCount = 0; monthCount < 24; ++monthCount) {
+			time_t candidate = makeTime(parts);
+			tmElements_t actual;
+			breakTime(candidate, actual);
+			if (actual.Day == parts.Day && actual.Month == parts.Month && candidate >= after)
+				return candidate;
+			if (++parts.Month > 12) { parts.Month = 1; ++parts.Year; }
+		}
+		return 0;
+	}
+	}
+	return 0;
+}
+
+void hScheduler::updateSchedule(hCommand &command, time_t next)
+{
+	command._nextDue = next;
+	command.scheduleTime.tm_wday = weekday(next); // TimeLib: Sunday=1 ... Saturday=7.
+	command.scheduleTime.tm_hour = hour(next);
+	command.scheduleTime.tm_min = minute(next);
+	command.scheduleTime.tm_mon = month(next); // Existing API uses TimeLib months 1-12.
+}
+
+void hScheduler::initializeSchedule(hCommand &command, time_t current)
+{
+	command._nextDue = nextOccurrence(command, current - current % 60);
+	// Preserve a specifically requested future first hour/minute. Once started,
+	// recurrence is computed from the current calendar rather than stale fields.
+	if (command.scheduleType == hourly && command.scheduleTime.tm_hour > hour(current))
+		command._nextDue = (current / SECS_PER_DAY) * SECS_PER_DAY +
+			command.scheduleTime.tm_hour * SECS_PER_HOUR + command.scheduleTime.tm_min * SECS_PER_MIN + command.scheduleTime.tm_sec;
+	if (command.scheduleType == minutly && command.scheduleTime.tm_min > minute(current))
+		command._nextDue = (current / SECS_PER_HOUR) * SECS_PER_HOUR +
+			command.scheduleTime.tm_min * SECS_PER_MIN + command.scheduleTime.tm_sec;
+	command._scheduleInitialized = true;
+}
 
 bool hScheduler::checkSchedule(int cNumber)
 {
-	if (commands[cNumber] == NULL)
-	{
-		return false;
+	hCommand &command = *commands[cNumber];
+	if (timeStatus() == timeNotSet) {
+		// Immediate relay commands remain usable without NTP; calendar tasks wait.
+		return !command.requiresClock() && command.scheduleTime.tm_hour == hour() &&
+			command.scheduleTime.tm_min == minute();
 	}
-	switch (commands[cNumber]->scheduleType)
-	{
-	case daily:
-		if (commands[cNumber]->scheduleTime.tm_wday == weekday() && commands[cNumber]->scheduleTime.tm_hour == hour() && (commands[cNumber]->scheduleTime.tm_min == minute()))
-		{
-			commands[cNumber]->scheduleTime.tm_wday++;
-			if (commands[cNumber]->scheduleTime.tm_wday > 6)
-			{
-				commands[cNumber]->scheduleTime.tm_wday = 0;
-			}
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-		break;
-	case hourly:
-		if (commands[cNumber]->scheduleTime.tm_hour == hour() && commands[cNumber]->scheduleTime.tm_min == minute())
-		{
-			commands[cNumber]->scheduleTime.tm_hour++;
-			if (commands[cNumber]->scheduleTime.tm_hour > 23)
-			{
-				commands[cNumber]->scheduleTime.tm_hour = 0;
-			}
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-		break;
-	case minutly:
-		if (commands[cNumber]->scheduleTime.tm_min == minute())
-		{
-			commands[cNumber]->scheduleTime.tm_min++;
-			if (commands[cNumber]->scheduleTime.tm_min > 59)
-			{
-				commands[cNumber]->scheduleTime.tm_min = 0;
-			}
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-		break;
-
-	case weekly:
-		return false; // Weekly scheduling remains unsupported.
-	case monthly:
-		if (commands[cNumber]->scheduleTime.tm_mon == month() && commands[cNumber]->scheduleTime.tm_hour == hour() && commands[cNumber]->scheduleTime.tm_min == minute())
-		{
-			commands[cNumber]->scheduleTime.tm_mon++;
-			if (commands[cNumber]->scheduleTime.tm_mon > 12)
-			{
-				commands[cNumber]->scheduleTime.tm_mon = 1;
-			}
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-		break;
+	time_t current = now();
+	if (!command._scheduleInitialized) {
+		initializeSchedule(command, current);
 	}
-
-	return false;
+	if (command._nextDue == 0 || current < command._nextDue) return false;
+	// Missed periods are skipped, not replayed. Execute at most once in the
+	// current scheduled minute, then advance directly to a future occurrence.
+	time_t occurrence = nextOccurrence(command, current - current % 60);
+	bool due = occurrence <= current && current - occurrence < 60;
+	updateSchedule(command, nextOccurrence(command, current + 1));
+	return due;
 }
 
 bool hScheduler::findDuplicate(hCommand *command)
@@ -246,17 +271,19 @@ bool hCommand::isDuplicateOf(const hCommand &other) const
 		commandContext() == other.commandContext() &&
 		_callbackFunction == other._callbackFunction && payload == other.payload &&
 		disposable == other.disposable && scheduleType == other.scheduleType &&
-		scheduleTime.tm_hour == other.scheduleTime.tm_hour &&
-		scheduleTime.tm_min == other.scheduleTime.tm_min &&
-		scheduleTime.tm_sec == other.scheduleTime.tm_sec &&
-		scheduleTime.tm_wday == other.scheduleTime.tm_wday &&
-		scheduleTime.tm_mday == other.scheduleTime.tm_mday &&
-		scheduleTime.tm_mon == other.scheduleTime.tm_mon &&
-		scheduleTime.tm_year == other.scheduleTime.tm_year;
+		_identity.hour == other._identity.hour &&
+		_identity.minute == other._identity.minute &&
+		_identity.second == other._identity.second &&
+		_identity.weekday == other._identity.weekday &&
+		_identity.day == other._identity.day &&
+		_identity.month == other._identity.month &&
+		_identity.year == other._identity.year;
 }
 
 hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload)
-	: disposable(disposable), scheduleTime(scheduleTime), scheduleType(scheduleType), payload(payload)
+	: disposable(disposable), scheduleTime(scheduleTime), scheduleType(scheduleType), payload(payload),
+	  _identity{scheduleTime.tm_hour, scheduleTime.tm_min, scheduleTime.tm_sec,
+	            scheduleTime.tm_wday, scheduleTime.tm_mday, scheduleTime.tm_mon, scheduleTime.tm_year}
 {}
 
 hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)())
@@ -273,12 +300,11 @@ hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType,
 
 bool hPumpCommand::execute()
 {
-	// turn on selected pump turnOnPump(payload);
-#ifndef _CPPWIN
-	Serial.println("executing task, for payload= ");
-	Serial.print(this->payload);
-#endif //
-	return true;
+	if (_config == nullptr) return false;
+	bool running = payload >= 1 && payload <= _MAX_HEATING_PUMPS_NO;
+	int pump = running ? payload : payload - 10;
+	if (pump < 1 || pump > _MAX_HEATING_PUMPS_NO) return false;
+	return _config->switchPump(pump, running);
 }
 
 hPumpsController::hPumpsController(hScheduler *scheduler, hConfigurator *config)
@@ -287,17 +313,9 @@ hPumpsController::hPumpsController(hScheduler *scheduler, hConfigurator *config)
 	_config = config;
 }
 
-void hPumpsController::createDailyPlan(bool holiday) //daily plan factory
+bool hPumpsController::createDailyPlan(bool holiday)
 {
-
-	if (holiday)
-	{
-		//create holiday daily plan for floor heating or domestic hot water circulation pump
-	}
-
-	if (!holiday)
-	{
-	}
+	return !holiday && createPlanForDomesticWaterPump(this);
 }
 
 void hPumpsController::removeDailyPlan(int pumpNumber)
@@ -308,13 +326,16 @@ void hPumpsController::removeDailyPlan(int pumpNumber)
 
 bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
-	bool canTurnOn = true;
+	if (!isfinite(actualTemp) || !isfinite(setTemp) || pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO)
+		return false;
+	bool canTurnOn = _config->canRestartPump(pumpNumber);
 	float tempModifier = 0;
-	if (hour() > 10 && hour() < 14)
+	int currentHour = hour();
+	if (timeStatus() != timeNotSet && currentHour > 10 && currentHour < 14)
 	{
 		tempModifier = _MAX_DAY_OVERHEATING;
 	}
-	if (hour() > 22 && hour() < 6)
+	if (timeStatus() != timeNotSet && (currentHour > 22 || currentHour < 6))
 	{
 		tempModifier = _MAX_NIGHT_COOLING;
 	}
@@ -336,17 +357,18 @@ bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 		tTime.tm_min = minute();
 		tTime.tm_mday = day();
 		tTime.tm_wday = weekday();
-		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber)))
+		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber, _config)))
 			return false;
 		//update config
 		_config->setPumpStatusOn(pumpNumber, actualTemp, setTemp);
-		sanityCheck();
 	}
 	return canTurnOn;
 }
 
-bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float /*actualTemp*/, float /*setTemp*/)
+bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
+	if (!isfinite(actualTemp) || !isfinite(setTemp) || pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO)
+		return false;
 	bool canTurnOff = true;
 	//check turn on off validation for example from config.history
 
@@ -359,7 +381,7 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float /*actualTemp*/, 
 		canTurnOff = false;
 	}
 	//check last _MIN_PUMP_ONOFF_CYCLE minut history  for switch on - off
-	if (_config->lastOnOffPump(pumpNumber, _MIN_MINUTS_FROM_LAST_START) > 0 || _DISABLE_MAX_ONOFF_VALIDATION)
+	if (!_config->canStopPump(pumpNumber))
 	{
 		canTurnOff = false;
 #ifndef _CPPWIN
@@ -388,10 +410,9 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float /*actualTemp*/, 
 		tTime.tm_min = minute();
 		tTime.tm_mday = day();
 		tTime.tm_wday = weekday();
-		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber + 10)))
+		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber + 10, _config)))
 			return false;
 		_config->setPumpStatusOff(pumpNumber);
-		sanityCheck();
 	}
 	else
 	{
@@ -402,32 +423,36 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float /*actualTemp*/, 
 	return canTurnOff;
 }
 
-void hPumpsController::turnOnDomesticWaterPumpReq(tm tTime)
+bool hPumpsController::turnOnDomesticWaterPumpReq(tm tTime)
 {
 
 	//functions will be call from MQTT incoming requests
-	_scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, hourly, _DOMESTIC_WATER_PUMP,_config));
-	sanityCheck();
+	return _scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, daily, _DOMESTIC_WATER_PUMP,_config)) >= 0;
 }
 
-void hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
+bool hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
 {
-	if (_scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF, _config)) < 0)
-		return;
+	if (_scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, daily, _DOMESTIC_WATER_PUMP_OFF, _config)) < 0)
+		return false;
 	_config->manualCirculationEnabled = false;
-	sanityCheck();
+	return true;
+}
+
+bool hPumpsController::forceStopPump(int pumpNumber)
+{
+	if (!_config->switchPump(pumpNumber, false)) return false;
+	_config->setPumpStatusOff(pumpNumber);
+	return true;
 }
 
 void hPumpsController::sanityCheck()
 {
-	for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; i++)
-	{
-		if (_config->getPumpRunningMinuts(i) >= _MAX_HEATING_PUMP_RUNNING_MINUTES)
-		{
-			this->turnOffHeatPumpReq(i, 0, 0);
-		}
+	_config->tickMinutes();
+	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; ++i) {
+		int limit = i == _DOMESTIC_WATER_PUMP ? _DOMESTIC_WATER_PUMP_RUN_MINUTS : _MAX_HEATING_PUMP_RUNNING_MINUTES;
+		if (_config->getPumpStatus(i) && _config->getPumpRunningMinuts(i) >= limit)
+			forceStopPump(i); // Does not depend on scheduler capacity or recursive execution.
 	}
-	//search for pumps running longer than 24h
 }
 
 bool hCallbackCommand::execute()
@@ -442,12 +467,13 @@ bool hCallbackCommand::execute()
 }
 
 bool hDomesticWaterPumpCommand::execute()
-{	
-	if (payload == _DOMESTIC_WATER_PUMP) {
-		_config->setPumpStatusOn(_DOMESTIC_WATER_PUMP,45,45);
-	}
-	else {
-		_config->setPumpStatusOff(_DOMESTIC_WATER_PUMP);
-	}
+{
+	if (_config == nullptr || (payload != _DOMESTIC_WATER_PUMP && payload != _DOMESTIC_WATER_PUMP_OFF)) return false;
+	bool running = payload == _DOMESTIC_WATER_PUMP;
+	if (running && (_config->getPumpStatus(_DOMESTIC_WATER_PUMP) || !_config->canRestartPump(_DOMESTIC_WATER_PUMP))) return false;
+	if (!running && _config->getPumpStatus(_DOMESTIC_WATER_PUMP) && !_config->canStopPump(_DOMESTIC_WATER_PUMP)) return false;
+	if (!_config->switchPump(_DOMESTIC_WATER_PUMP, running)) return false;
+	if (running) _config->setPumpStatusOn(_DOMESTIC_WATER_PUMP, 45, 45);
+	else _config->setPumpStatusOff(_DOMESTIC_WATER_PUMP);
 	return true;
 }

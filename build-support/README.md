@@ -38,10 +38,14 @@ i commity bibliotek. Narzędzia i zależności trafiają do ignorowanego
   wymaga ponownego przygotowania przed buildem.
 
 Build kopiuje śledzone pliki centrali do `build/b0/sketch/heating_server`
-i używa wyłącznie `heating_server/secrets.example.h` jako `secrets.h`.
-Nie czyta lokalnych sekretów. Wykonuje czystą kompilację, zapisując komendę
+Domyślnie używa wyłącznie przykładów sekretów i przekaźników.
+Nie czyta lokalnych sekretów. Opcja `--local-config` jawnie wybiera lokalne,
+ignorowane `heating_server/secrets.h` i `relay_config.h`; służy do przygotowania
+obrazu po uzupełnieniu własnej konfiguracji opisanej w [README](../README.md). Wykonuje czystą kompilację, zapisując komendę
 w `build/b0/command.json`, log wraz z rozmiarami w `build/b0/compile.log`,
-a ELF/BIN w `build/b0/output/`. Testy UDP opisano w
+a ELF/BIN w `build/b0/output/`. Build przekazuje `MQTT_SOCKET_TIMEOUT=1`
+do kompilacji całego szkicu i PubSubClient; wersja biblioteki pozostaje 2.7.
+Testy wszystkich modułów opisano w [README](../README.md). Testy UDP opisano w
 [tests/host-udp/README.md](../tests/host-udp/README.md).
 
 Opcje profilu generic, w tym 512 KB flash, pozostają historyczne i nie

@@ -46,6 +46,8 @@ protected:
   void getDeviceInfo(JsonObject &result);
 
 private:
+  bool _internalWiFiMode = false;
+  IPAddress activeIP() const;
   bool _commandFlag = false;
   IPAddress _lastSenderIp;
   uint16_t _lastSenderPort = 0;
@@ -53,10 +55,11 @@ private:
 
 public:
   UDPMessengerService(uint16_t port);
+  void begin(bool internalWiFiMode);
   void listen();
   void discoverDevices(); //send broadCast Packet
   tClientCommand getCurrentCommand();
   bool checkNewCommand();
-  void sendBackMessage(bool status, bool runningStatus);
+  void sendBackMessage(bool status, bool runningStatus, const char *outputState = nullptr);
   void setTempFromMQTT(tClientCommand mqttCommand);
 };

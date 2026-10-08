@@ -17,7 +17,7 @@
 
 void hScreen::printStatusBar(const char Msg[]){
   // LCD text may be clipped and padded; MQTT topics must never be clipped.
-  snprintf(this->lines[3], sizeof(this->lines[3]), "%-20.20s", Msg);
+  snprintf(this->lines[3], sizeof(this->lines[3]), "%-20.20s", Msg != nullptr ? Msg : "");
 }
 
 void hScreen::printNetworkStatus(bool internalWiFiMode)
@@ -34,21 +34,21 @@ void hScreen::printNetworkStatus(bool internalWiFiMode)
 
 void hScreen::printMainScreen(){
   char hr[21];
-  sprintf(hr," H(%s)   %02d:%02d   C(%s)", _config->heatPumpsRunning() ? "*" : "-",  hour(), minute(), _config->domesticWaterPumpIsRunning() ? "*" : "-");
+  snprintf(hr, sizeof(hr)," H(%s)   %02d:%02d   C(%s)", _config->heatPumpsRunning() ? "*" : "-",  hour(), minute(), _config->domesticWaterPumpIsRunning() ? "*" : "-");
   strcpy(this->lines[0],_BLANK_LINE);    
   strcpy(this->lines[1],_BLANK_LINE);    
   strcpy(this->lines[2],_BLANK_LINE);  
   strcpy(this->lines[3],_BLANK_LINE);
   strcpy(this->lines[0],hr);
-  sprintf(hr, "%sP1: %03d%%  %sP2: %03d%%",_config->getPumpStatus(1) ?"+" : " ", _config->getPercentage(1), _config->getPumpStatus(2) ? "+" : " ",_config->getPercentage(2));
+  snprintf(hr, sizeof(hr), "%sP1: %03d%%  %sP2: %03d%%",_config->getPumpStatus(1) ?"+" : " ", _config->getPercentage(1), _config->getPumpStatus(2) ? "+" : " ",_config->getPercentage(2));
   strcpy(this->lines[1], hr);
-  sprintf(hr, "%sP3: %03d%%  %sP4: %03d%%", _config->getPumpStatus(3) ?"+" : " ", _config->getPercentage(3), _config->getPumpStatus(4) ? "+" : " ", _config->getPercentage(4));
+  snprintf(hr, sizeof(hr), "%sP3: %03d%%  %sP4: %03d%%", _config->getPumpStatus(3) ?"+" : " ", _config->getPercentage(3), _config->getPumpStatus(4) ? "+" : " ", _config->getPercentage(4));
   strcpy(this->lines[2], hr);
 
 };
 
 char* hScreen::getLine(int LineNumber){
-  return this->lines[LineNumber];
+  return LineNumber >= 0 && LineNumber < 4 ? this->lines[LineNumber] : nullptr;
 }
 
 int hScreen::selectedMenuItem()
@@ -81,7 +81,7 @@ hScreen::hScreen(LiquidCrystal_I2C* lcd, hConfigurator* config){
 };
 
 void hScreen::printSplashScreen(){
-  strcpy(this->lines[0],_SERVER_VERSION);
+  snprintf(this->lines[0], sizeof(this->lines[0]), "%.20s", _SERVER_VERSION);
   strcpy(this->lines[1],"(c) 2018/19 Marceli ");
   strcpy(this->lines[2],_BLANK_LINE);
   strcpy(this->lines[3],_BLANK_LINE);  
@@ -106,37 +106,37 @@ void hScreen::printMenu()
 		char hr[21];
 	case 1 :
 		strcpy(this->lines[0], " MENU> CONFIG 1  ");
-		sprintf(hr, "%sRECONNECT WIFI", _submenuItem == 1 ? ">" : " ");
+		snprintf(hr, sizeof(hr), "%sRECONNECT WIFI", _submenuItem == 1 ? ">" : " ");
 		strcpy(this->lines[1], hr);
-		sprintf(hr, "%sUPDATE NTP", _submenuItem == 2 ? ">" : " ");
+		snprintf(hr, sizeof(hr), "%sUPDATE NTP", _submenuItem == 2 ? ">" : " ");
 		strcpy(this->lines[2], hr);
-    sprintf(hr, "%sMODE :%s", _submenuItem == 3 ? ">" : " ", _INTERNAL_WIFI_MODE ? "INTERNAL" : "EXTERNAL");
+    snprintf(hr, sizeof(hr), "%sMODE :%s", _submenuItem == 3 ? ">" : " ", _INTERNAL_WIFI_MODE ? "INTERNAL" : "EXTERNAL");
     strcpy(this->lines[3], hr);
 		break;
 	case 2:
 		strcpy(this->lines[0], " MENU> CONFIG 2  ");
-		sprintf(hr, " %s", WiFi.SSID().c_str());
+		snprintf(hr, sizeof(hr), " %.19s", WiFi.SSID().c_str());
 		strcpy(this->lines[1], hr);
-		sprintf(hr, " RSSI :%03d%%", signalQuality);
+		snprintf(hr, sizeof(hr), " RSSI :%03d%%", signalQuality);
 		strcpy(this->lines[2], hr);
     printNetworkStatus(false);
 		break;
 	case 3:
 		strcpy(this->lines[0], " MENU> SCHEDULER  ");
-		sprintf(hr, "%sHOLIDAY PLAN: %s", _submenuItem == 1 ? ">" : " ", _config->holidayPlan  ? "ON ":"OFF");
+		snprintf(hr, sizeof(hr), "%sHOLIDAY PLAN: %s", _submenuItem == 1 ? ">" : " ", _config->holidayPlan  ? "ON ":"OFF");
 		strcpy(this->lines[1], hr);
-		sprintf(hr, "%sNORMAL PLAN : %s", _submenuItem == 2 ? ">" : " ", _config->holidayPlan ? "OFF" : "ON ");
+		snprintf(hr, sizeof(hr), "%sNORMAL PLAN : %s", _submenuItem == 2 ? ">" : " ", _config->holidayPlan ? "OFF" : "ON ");
 		strcpy(this->lines[2], hr);
-		sprintf(hr, "%sRESET SCHEDULER", _submenuItem == 3 ? ">" : " ");
+		snprintf(hr, sizeof(hr), "%sRESET SCHEDULER", _submenuItem == 3 ? ">" : " ");
 		strcpy(this->lines[3], hr);
 
-		//removes all daily planes for circulation pump
+		break;
 
-	case 5:
+	case 4:
 		strcpy(this->lines[0], " MENU> SYSTEM");
-		sprintf(hr, "%sCIRCULATION:%s", _submenuItem == 1 ? ">" : " ", _config->manualCirculationEnabled ? "ON" : "OFF");
+		snprintf(hr, sizeof(hr), "%sCIRCULATION:%s", _submenuItem == 1 ? ">" : " ", _config->manualCirculationEnabled ? "ON" : "OFF");
 		strcpy(this->lines[1], hr);
-		sprintf(hr, "%sREBOOT...", _submenuItem == 2 ? ">" : " ");
+		snprintf(hr, sizeof(hr), "%sREBOOT...", _submenuItem == 2 ? ">" : " ");
 		strcpy(this->lines[2], hr);
 	break;
  default:
@@ -216,6 +216,7 @@ hDisableBacklight::hDisableBacklight(bool disposable, tm scheduleTime, eschedule
 
 bool hDisableBacklight::execute()
 {
+	if (_lcd == nullptr) return false;
 	_lcd->noBackLight();
 	return true;
 }

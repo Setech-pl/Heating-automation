@@ -19,6 +19,7 @@ public:
 	bool isDuplicateOf(const hCommand &other) const;
 	// Unknown derived commands are not deduplicated. Each concrete command
 	// opts in with its own typeKey; context identifies any external target.
+	virtual bool requiresClock() const { return true; }
 	virtual const void *commandType() const { return nullptr; }
 	virtual const void *commandContext() const { return _config; }
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload);
@@ -30,6 +31,12 @@ public:
 	int payload;
 	char result[21] = {};
 
+private:
+	friend class hScheduler;
+	struct Identity { int hour, minute, second, weekday, day, month, year; };
+	const Identity _identity; // Original registration key; advancing time never changes it.
+	time_t _nextDue = 0;
+	bool _scheduleInitialized = false;
 protected:
 	template<class T> static const void *typeKey() {
 		static char key;
@@ -101,6 +108,10 @@ private:
 	bool executeTask(int commandId);
 	int getFreeSlot();
 	bool checkSchedule(int cNumber);
+	bool validSchedule(const hCommand &command) const;
+	time_t nextOccurrence(const hCommand &command, time_t after) const;
+	void updateSchedule(hCommand &command, time_t next);
+	void initializeSchedule(hCommand &command, time_t current);
 	bool findDuplicate(hCommand *polecenie);
 };
 
@@ -113,20 +124,23 @@ class hPumpCommand : public hCommand
 public:
 	const void *commandType() const override { return typeKey<hPumpCommand>(); }
 	bool execute() override;
-	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload){};
+	bool requiresClock() const override { return !disposable; }
+	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *config = nullptr)
+		: hCommand(disposable, scheduleTime, scheduleType, payload, config) {};
 };
 
 class hPumpsController
 {
 public:
 	hPumpsController(hScheduler *scheduler, hConfigurator *config);
-	void createDailyPlan(bool holiday);
+	bool createDailyPlan(bool holiday);
 	void removeDailyPlan(int pumpNumber); //removes plan for pump number /1-5/
 	bool turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
 	bool turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp);
-	void turnOnDomesticWaterPumpReq(tm tTime);
-	void turnOffDomesticWaterPumpReq(tm tTime);
+	bool turnOnDomesticWaterPumpReq(tm tTime);
+	bool turnOffDomesticWaterPumpReq(tm tTime);
 	void sanityCheck();
+	bool forceStopPump(int pumpNumber);
 
 private:
 	hScheduler *_scheduler;

@@ -1,4 +1,6 @@
 #pragma once
+#include <stdint.h>
+#include "relay_output.h"
 
 #define _EXTERNAL_WIFI_SID ""
 #define _EXTERNAL_WIFI_PASS ""
@@ -76,15 +78,27 @@ public:
 	bool registerClient(thermoClientStat client);
 	void setMQTTStatus(bool mqttStatus);
 	bool getMQTTStatus();
-	hConfigurator();
+	explicit hConfigurator(hRelayOutputs *outputs = nullptr);
+	bool switchPump(int pumpNumber, bool running);
+	hRelayOutputs::State outputState(int pumpNumber) const;
+	bool canRestartPump(int pumpNumber);
+	bool canStopPump(int pumpNumber);
+	uint64_t uptime(); // Extended monotonic milliseconds; call at least once per millis wrap.
 	int getPercentage(int pumpNumber);
 	~hConfigurator();
 
 private:
 	pumpStatus _pumps[6];
-	pumpStatus _pumpsHistory[256];
+	struct Event { uint64_t milliseconds; int pumpNumber; bool on; };
+	Event _pumpsHistory[256] = {};
+	hRelayOutputs *_outputs;
+	uint64_t _started[6] = {};
+	uint64_t _stopped[6] = {};
+	bool _hasStopped[6] = {};
+	uint64_t _uptime = 0;
+	uint32_t _lastMillis;
 	bool mqttStatus = false;
 	//thermoClientStat _clients[4];
 	int _pumpsHistoryC = 0;
-	void saveHistory(pumpStatus oldStatus);
+	void saveHistory(int pumpNumber, bool on, uint64_t timestamp);
 };

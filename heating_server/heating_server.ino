@@ -10,23 +10,36 @@
 #include <WiFiUdp.h>
 #include "screen.h"
 #include <ArduinoJson.h>
-#include "UDPMessengerService.h"
+#include "udpmessengerservice.h"
+#include "runtime.h"
+#include "relay_output.h"
+#if __has_include("relay_config.h")
+#include "relay_config.h"
+#else
+#include "relay_config.example.h"
+#endif
+#include <new>
 #include "createDailyPlan.h"
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-hScheduler *scheduler = new hScheduler();
-hConfigurator *config = new hConfigurator();
-hPumpsController *heatPumpController = new hPumpsController(scheduler, config);
-hScreen *hdisplay = new hScreen(&lcd, config);
+hArduinoGpio gpio;
+hRelayOutputs relayOutputs(gpio, HEATING_RELAYS);
+hScheduler schedulerInstance;
+hScheduler *scheduler = &schedulerInstance;
+hConfigurator configInstance(&relayOutputs);
+hConfigurator *config = &configInstance;
+hPumpsController controllerInstance(scheduler, config);
+hPumpsController *heatPumpController = &controllerInstance;
+hScreen displayInstance(&lcd, config);
+hScreen *hdisplay = &displayInstance;
 UDPMessengerService udpMessenger(3636);
 // Enabling MQTT client support
-const char clientid[] = "HeatingSrv";
 WiFiClient espClient;
 PubSubClient client(espClient);
-bool gotMQTTCommand = false;
-byte *MQTTCommand;
-unsigned long timeMillis = 0;
+hMqttReconnect mqttReconnect;
+uint32_t timeMillis = 0;
+uint32_t lastNtpRetry = 0;
 bool internalWIFIMode = false;
 
 /*
@@ -43,6 +56,12 @@ void hook_sanity_check()
   heatPumpController->sanityCheck();
 }
 
+const char *outputStateName(int pumpId)
+{
+  hRelayOutputs::State state = config->outputState(pumpId);
+  return state == hRelayOutputs::unknown ? "UNCONFIGURED" : state == hRelayOutputs::on ? "ON" : "OFF";
+}
+
 void hook_restart()
 {
   ESP.restart();
@@ -50,20 +69,18 @@ void hook_restart()
 
 void mqttCallback(char *topic, byte *payload, unsigned int length)
 {
-  Serial.println(topic);
-  if (strcmp(topic, _MQTT_COMMANDS_TOPIC) == 0)
-  {
-    gotMQTTCommand = true;
-  }
-  if (gotMQTTCommand)
-  {
-    Serial.println("got incomming command");
-    for (int i = 0; i < length; i++)
-    {
-      Serial.print((char)payload[i]);
-    }
-    Serial.println("end of command");
-  }
+  // No inbound MQTT command schema exists in this project. Log bounded data;
+  // never treat reception/subscription as execution or retain a borrowed payload.
+  if (topic == nullptr || payload == nullptr || length > 512 || strcmp(topic, _MQTT_COMMANDS_TOPIC) != 0) return;
+  Serial.println("MQTT command unsupported (no protocol configured)");
+}
+
+void hook_ntp_update()
+{
+  if (internalWIFIMode || WiFi.status() != WL_CONNECTED) return;
+  tm schedule = {};
+  ntp_update command(true, schedule, daily, 0);
+  command.execute();
 }
 
 /*
@@ -73,6 +90,7 @@ Special setup functions
 void setup()
 {
   Serial.begin(115200);
+  if (!relayOutputs.begin()) Serial.println("Some relay channels are unconfigured");
   Serial.println("Entering setup mode");
   int counter = 0;
   bool wynik = false;
@@ -81,7 +99,7 @@ void setup()
   connect_external_wifi connExternalWiFi(true, t, hourly, 0);
   ntp_update ntpUpdateCommand(true, t, hourly, 0);
   lcd.init();
-  lcd.backlight(); // Enable or Turn On the backlight
+  hdisplay->backlight();
   hdisplay->printSplashScreen();
   hdisplay->renderScreen();
   delay(200);
@@ -117,86 +135,65 @@ void setup()
   delay(1000);
   // if _INTERNAL_WIFI_MODE == true then enable internal wifi
 
+  udpMessenger.begin(internalWIFIMode);
   hook_discover_devices();
   hdisplay->printNetworkStatus(internalWIFIMode);
   hdisplay->renderScreen();
   delay(1000);
-  timeMillis = 0;
+  timeMillis = static_cast<uint32_t>(millis());
+  lastNtpRetry = timeMillis;
 
   // add periodical device discovery process
   t.tm_hour = hour();
   t.tm_min = 32;
   t.tm_mday = day();
   t.tm_wday = weekday();
-  scheduler->addTask(new hCallbackCommand(false, t, hourly, &hook_discover_devices));
+  scheduler->addTask(new (std::nothrow) hCallbackCommand(false, t, hourly, &hook_discover_devices));
 
   // add periodical sanity check
-  t.tm_hour = 3;
-  t.tm_min = 1;
+  t.tm_hour = hour();
+  t.tm_min = minute();
   t.tm_mday = day();
   t.tm_wday = weekday();
-  scheduler->addTask(new hCallbackCommand(false, t, daily, &hook_discover_devices));
+  scheduler->addTask(new (std::nothrow) hCallbackCommand(false, t, minutly, &hook_sanity_check));
 
   // add periodical NTP Time update
   t.tm_hour = 0;
   t.tm_min = 10;
   t.tm_mday = day();
   t.tm_wday = weekday();
-  scheduler->addTask(new ntp_update(false, t, daily, 0));
+  scheduler->addTask(new (std::nothrow) hCallbackCommand(false, t, daily, &hook_ntp_update));
 
   // Enabling MQTT client support
 
+  espClient.setTimeout(200); // DNS and TCP connection timeout, milliseconds.
   client.setServer(_MQTT_SERVER, _MQTT_SERVER_PORT);
   client.setCallback(mqttCallback);
   hook_mqtt_reconnect();
-  t.tm_hour = hour();
-  t.tm_min = minute();
-  scheduler->addTask(new hCallbackCommand(false, t, minutly, &hook_mqtt_reconnect));
+  if (HEATING_ENABLE_DOMESTIC_PLAN) createPlanForDomesticWaterPump(heatPumpController);
 }
 
 void hook_mqtt_reconnect()
-
 {
-  if (client.connected())
-  {
-    config->setMQTTStatus(true);
-    Serial.println("Checking mqtt status : connected");
-  }
-  else
-  {
-    int i = 0;
-    while (i < 5)
-    {
-      i++;
-      if (client.connect(_MQTT_CLIENT_ID))
-      {
-        Serial.println("connected to MQTT");
-        config->setMQTTStatus(true);
-        client.subscribe(_MQTT_COMMANDS_TOPIC);
-        break;
-      }
-      else
-      {
-        Serial.println("Error connecting to mqtt server");
-        config->setMQTTStatus(false);
-        delay(150);
-      }
-    }
-  }
+  config->setMQTTStatus(mqttReconnect.poll(client, static_cast<uint32_t>(millis()),
+    !internalWIFIMode && WiFi.status() == WL_CONNECTED,
+    _MQTT_CLIENT_ID, _MQTT_LOGIN, _MQTT_PASSWORD, _MQTT_COMMANDS_TOPIC));
 }
 
 void loop()
 {
 
-  if (timeMillis + 1000 < millis())
+  if (heatingTickDue(static_cast<uint32_t>(millis()), timeMillis, 1000))
   {
+    hook_sanity_check(); // Monotonic safety also works without a valid NTP clock.
     scheduler->executeTasks();
-    config->tickMinutes();
     hdisplay->printMainScreen();
     hdisplay->printStatusBar(_BLANK_LINE);
     hdisplay->renderScreen();
-    timeMillis = millis();
+
   }
+  if (timeStatus() == timeNotSet && !internalWIFIMode &&
+      heatingTickDue(static_cast<uint32_t>(millis()), lastNtpRetry, 60000)) hook_ntp_update();
   udpMessenger.listen();
 
   //Incoming commands router
@@ -209,11 +206,12 @@ void loop()
     if (strcmp(temp.cmd, "ON") == 0)
     {
       char tm[20];
-      sprintf(tm, "Pump %d ON Command", temp.ID);
+      snprintf(tm, sizeof(tm), "Pump %d ON", temp.ID);
       hdisplay->printMainScreen();
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
-      udpMessenger.sendBackMessage(heatPumpController->turnOnHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
+      bool accepted = heatPumpController->turnOnHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP);
+      udpMessenger.sendBackMessage(accepted, config->getPumpStatus(temp.ID), outputStateName(temp.ID));
       if (config->getMQTTStatus())
       {
         char subtopic[THERMOSTAT_TOPIC_CAPACITY];
@@ -227,17 +225,18 @@ void loop()
     if (strcmp(temp.cmd, "OFF") == 0)
     {
       char tm[20];
-      sprintf(tm, "Pump %d OFF", temp.ID);
+      snprintf(tm, sizeof(tm), "Pump %d OFF", temp.ID);
       hdisplay->printMainScreen();
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
-      udpMessenger.sendBackMessage(heatPumpController->turnOffHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP), config->getPumpStatus(temp.ID));
+      bool accepted = heatPumpController->turnOffHeatPumpReq(temp.ID, temp.actualTEMP, temp.targetTEMP);
+      udpMessenger.sendBackMessage(accepted, config->getPumpStatus(temp.ID), outputStateName(temp.ID));
     }
 
     if (strcmp(temp.cmd, "SHOWSERVER") == 0)
     {
       char tm[20];
-      sprintf(tm, "Registering C%d", temp.ID);
+      snprintf(tm, sizeof(tm), "Discovery C%d", temp.ID);
       hdisplay->printMainScreen();
       hdisplay->printStatusBar(tm);
       hdisplay->renderScreen();
@@ -246,16 +245,11 @@ void loop()
 
     if (strcmp(temp.cmd, "SHOWSTATUS") == 0)
     {
-      udpMessenger.sendBackMessage(true, config->getPumpStatus(temp.ID));
+      udpMessenger.sendBackMessage(temp.ID >= 1 && temp.ID <= _DOMESTIC_WATER_PUMP, config->getPumpStatus(temp.ID), outputStateName(temp.ID));
     }
   }
 
-  // MQTT client section
+  // A single bounded reconnect attempt is serviced independently of NTP.
   client.loop();
-  if (gotMQTTCommand)
-  {
-    //incoming external command - set temp to Thermo Client ID
-    Serial.println('i got mqtt command in main loop');
-    gotMQTTCommand = false;
-  }
+  hook_mqtt_reconnect();
 }

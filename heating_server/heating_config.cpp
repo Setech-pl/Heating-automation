@@ -1,5 +1,7 @@
 #define _CPPWINa 1
 #include "heating_config.h"
+#include <Arduino.h>
+#include <limits.h>
 #ifdef _CPPWIN
 #include "arduino_stub.h"
 #endif
@@ -9,9 +11,13 @@
 
 void hConfigurator::setPumpStatusOn(int pumpNumber, float actualTemp, float setTemp)
 {
+	if (getPumpStatus(pumpNumber)) return;
 	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP)
 	{
 		_pumps[pumpNumber].running = true;
+		_started[pumpNumber] = uptime();
+		_pumps[pumpNumber].minuts = 0;
+		_pumps[pumpNumber].actualMinute = minute();
 		_pumps[pumpNumber].start_minute = minute();
 		_pumps[pumpNumber].start_hour = hour();
 		_pumps[pumpNumber].pumpNumber = pumpNumber;
@@ -19,17 +25,20 @@ void hConfigurator::setPumpStatusOn(int pumpNumber, float actualTemp, float setT
 		_pumps[pumpNumber].actualTemp = actualTemp;
 		_pumps[pumpNumber].setTemp = setTemp;
 		if (pumpNumber < _DOMESTIC_WATER_PUMP)
-			saveHistory(_pumps[pumpNumber]);
+			saveHistory(pumpNumber, true, _started[pumpNumber]);
 	}
 }
 
 void hConfigurator::setPumpStatusOff(int pumpNumber)
 {
+	if (!getPumpStatus(pumpNumber)) return;
 	if (pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP)
 	{
 		_pumps[pumpNumber].running = false;
+		_stopped[pumpNumber] = uptime();
+		_hasStopped[pumpNumber] = true;
 		if (pumpNumber < _DOMESTIC_WATER_PUMP)
-			saveHistory(_pumps[pumpNumber]);
+			saveHistory(pumpNumber, false, _stopped[pumpNumber]);
 		_pumps[pumpNumber].actualTemp = 0;
 		_pumps[pumpNumber].minuts = 0;
 		_pumps[pumpNumber].setTemp = 0;
@@ -62,7 +71,7 @@ bool hConfigurator::getPumpStatus(int pumpNumber)
 
 int hConfigurator::getPumpRunningMinuts(int pumpNumber)
 {
-	return _pumps[pumpNumber].minuts;
+	return pumpNumber > 0 && pumpNumber <= _DOMESTIC_WATER_PUMP ? _pumps[pumpNumber].minuts : 0;
 }
 
 bool hConfigurator::heatPumpsRunning()
@@ -83,99 +92,82 @@ bool hConfigurator::domesticWaterPumpIsRunning()
 	return _pumps[_DOMESTIC_WATER_PUMP].running;
 };
 
+uint64_t hConfigurator::uptime()
+{
+	uint32_t current = static_cast<uint32_t>(millis());
+	_uptime += static_cast<uint32_t>(current - _lastMillis);
+	_lastMillis = current;
+	return _uptime;
+}
+
+bool hConfigurator::switchPump(int pumpNumber, bool running)
+{
+	return _outputs != nullptr && _outputs->set(pumpNumber, running);
+}
+
+hRelayOutputs::State hConfigurator::outputState(int pumpNumber) const
+{
+	return _outputs != nullptr ? _outputs->state(pumpNumber) : hRelayOutputs::unknown;
+}
+
+bool hConfigurator::canRestartPump(int pumpNumber)
+{
+	if (pumpNumber < 1 || pumpNumber > _DOMESTIC_WATER_PUMP) return false;
+	return _DISABLE_MAX_ONOFF_VALIDATION || !_hasStopped[pumpNumber] ||
+		uptime() - _stopped[pumpNumber] >= uint64_t(_MIN_MINUTS_FROM_LAST_START) * 60000;
+}
+
+bool hConfigurator::canStopPump(int pumpNumber)
+{
+	if (pumpNumber < 1 || pumpNumber > _DOMESTIC_WATER_PUMP) return false;
+	return _DISABLE_MAX_ONOFF_VALIDATION ||
+		uptime() - _started[pumpNumber] >= uint64_t(_MIN_MINUTS_FROM_LAST_START) * 60000;
+}
+
 int hConfigurator::lastOnOffPump(int pumpNumber, int lastMinuts)
 {
+	if (pumpNumber < 1 || pumpNumber > _DOMESTIC_WATER_PUMP || lastMinuts <= 0) return 0;
+	if (lastMinuts > 59) lastMinuts = 59;
+	uint64_t current = uptime();
 	int result = 0;
-	int actualMinute = minute();
-	int actualHour = hour();
-	int actualDay = weekday();
-	if (lastMinuts > 59)
-		lastMinuts = 59;
-	if (lastMinuts < 0)
-		lastMinuts = 0;
-	if (actualHour < 0 || actualHour > 23)
-		actualHour = 0;
-	int minutsFromMidnight = actualHour * 60 + actualMinute;
-	for (int i = 0; i < (sizeof(_pumpsHistory) / sizeof(pumpStatus)); i++)
-	{
-		if (_pumpsHistory[i].pumpNumber == pumpNumber)
-		{
-			int countedStartMinutes = _pumpsHistory[i].start_hour * 60 + _pumpsHistory[i].start_minute;
-			if (_pumpsHistory[i].start_day != actualDay)
-				countedStartMinutes = countedStartMinutes - 1440;
-			if (countedStartMinutes + lastMinuts >= minutsFromMidnight)
-			{
-				//I found turn off
-				result++;
-			}
-		}
-	}
+	// Count ON transitions in the half-open monotonic window, never old weekdays.
+	for (const Event &event : _pumpsHistory)
+		if (event.pumpNumber == pumpNumber && event.on &&
+			current - event.milliseconds < uint64_t(lastMinuts) * 60000) ++result;
 	return result;
-};
+}
 
 void hConfigurator::tickMinutes()
 {
-	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; i++)
-	{
-		if (&_pumps[i] == nullptr)
-			continue;
-		if (_pumps[i].running && _pumps[i].actualMinute != minute())
-		{
-			_pumps[i].minuts++;
-			_pumps[i].actualMinute = minute();
+	uint64_t current = uptime();
+	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; ++i)
+		if (_pumps[i].running) {
+			uint64_t minutes = (current - _started[i]) / 60000;
+			_pumps[i].minuts = minutes > INT_MAX ? INT_MAX : static_cast<int>(minutes);
 		}
-	}
 }
 
 int hConfigurator::getPercentage(int pumpNumber)
 {
-	int all = 0;
-	float result = 0;
-	// get only stats from heat pumps 1-4 numbes
-	if (pumpNumber > 1 && pumpNumber <= _MAX_HEATING_PUMPS_NO)
-	{
-
-		for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; i++)
-		{
-			all += _pumps[i].minuts;
-		}
-		if (all > 0)
-		{
-			result = (100 * (_pumps[pumpNumber].minuts / (float)all));
-		}
-		else
-			result = 0;
-	}
-	else
-		result = 0;
-	return (int)result;
-}
-hConfigurator::~hConfigurator(){};
-
-bool hConfigurator::registerClient(thermoClientStat client)
-{
-	return false;
+	if (pumpNumber < 1 || pumpNumber > _MAX_HEATING_PUMPS_NO) return 0;
+	int64_t all = 0;
+	for (int i = 1; i <= _MAX_HEATING_PUMPS_NO; ++i) all += _pumps[i].minuts;
+	return all > 0 ? static_cast<int>(int64_t(100) * _pumps[pumpNumber].minuts / all) : 0;
 }
 
-hConfigurator::hConfigurator()
+hConfigurator::~hConfigurator() = default;
+
+bool hConfigurator::registerClient(thermoClientStat /*client*/)
 {
-	for (int i = 1; i <= _DOMESTIC_WATER_PUMP; i++)
-	{
-		_pumps[i].running = false;
-	}
-	for (int i = 0; i < (sizeof(_pumpsHistory) / sizeof(pumpStatus)); i++)
-	{
-		_pumpsHistory[i].pumpNumber = -1;
-	}
+	return false; // No client registration protocol has been supplied.
 }
 
-void hConfigurator::saveHistory(pumpStatus oldStatus)
-{
+hConfigurator::hConfigurator(hRelayOutputs *outputs)
+	: _outputs(outputs), _lastMillis(static_cast<uint32_t>(millis()))
+{}
 
-	if (_pumpsHistoryC >= sizeof(_pumpsHistory) / sizeof(pumpStatus))
-	{
-		_pumpsHistoryC = 0;
-	}
-	_pumpsHistory[_pumpsHistoryC] = oldStatus;
-	_pumpsHistoryC++;
-};
+void hConfigurator::saveHistory(int pumpNumber, bool on, uint64_t timestamp)
+{
+	_pumpsHistory[_pumpsHistoryC] = {timestamp, pumpNumber, on};
+	_pumpsHistoryC = (_pumpsHistoryC + 1) % 256;
+}
