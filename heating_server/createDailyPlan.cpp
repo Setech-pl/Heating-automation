@@ -3,7 +3,7 @@
 
 void createPlanForDomesticWaterPump(hPumpsController *heatPumpController)
 {
-    tm scht;
+    tm scht = {};
     //create normal daily plan for  domestic hot water circulation pump
     scht.tm_hour = 5;
     scht.tm_min = 0;

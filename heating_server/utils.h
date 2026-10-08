@@ -15,16 +15,18 @@ Utility commands
 
 class ntp_update : public hCommand {
   public:
+	const void *commandType() const override { return typeKey<ntp_update>(); }
     enum StartupResult { skipped, synchronized, failed };
     StartupResult synchronizeOnStartup(bool internalWiFiMode, hScreen &display);
-    bool execute();
+    bool execute() override;
     ntp_update(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 
 };
 
 class connect_external_wifi : public hCommand {
   public:
-    bool execute();
+	const void *commandType() const override { return typeKey<connect_external_wifi>(); }
+    bool execute() override;
     connect_external_wifi(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 
 };
@@ -32,6 +34,7 @@ class connect_external_wifi : public hCommand {
 
 class enable_internal_wifi : public hCommand {
 public:
-	bool execute();
+	const void *commandType() const override { return typeKey<enable_internal_wifi>(); }
+	bool execute() override;
 	enable_internal_wifi(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload) {};
 };

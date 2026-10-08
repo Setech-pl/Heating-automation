@@ -1,7 +1,7 @@
 #define _CPPWINa 1
 #include "scheduler.h"
 #include <time.h>
-#include "utils.h"
+#include <new>
 #ifndef _CPPWIN
 #include <TimeLib.h>
 #endif // !_CPPWIN
@@ -29,85 +29,100 @@ pumps aware payloads
 
 int hScheduler::addTask(hCommand *command)
 {
-	int i = getFreeSlot();
-	if (i < commandCounter)
-	{
-		if (!findDuplicate(command))
-			commands[i] = command;
-	}
-	else
+	if (command == nullptr)
+		return invalidTask;
+	// Protect an existing ownership relationship from accidental resubmission.
+	if (command == _executing)
+		return duplicate;
+	for (int i = 0; i < commandCounter; ++i)
+		if (commands[i] == command)
+			return duplicate;
+	if (findDuplicate(command))
 	{
 		delete command;
-		i = 0;
+		return duplicate;
 	}
-	return i;
+	int slot = getFreeSlot();
+	if (slot < 0)
+	{
+		delete command;
+		return full;
+	}
+	commands[slot] = command;
+	return slot;
 }
 
-int hScheduler::addExecuteTask(hCommand *polecenie)
+bool hScheduler::addExecuteTask(hCommand *command)
 {
-	int commandId = 0;
-	commandId = addTask(polecenie);
-	executeTasks(commandId);
-	return 1;
+	int commandId = addTask(command);
+	return commandId >= 0 && _executing == nullptr &&
+		checkSchedule(commandId) && executeTask(commandId);
 }
 
 void hScheduler::removeAllCommands()
 {
-	for (int i = 0; i < commandCounter; i++)
-	{
+	for (int i = 0; i < commandCounter; ++i)
 		removeCommand(i);
-	}
 }
 
-void hScheduler::executeTasks(int commandId)
+bool hScheduler::executeTask(int commandId)
 {
-	int i = commandId;
-	while (i < commandCounter)
+	if (_executing != nullptr || getTask(commandId) == nullptr)
+		return false;
+	_executing = commands[commandId];
+	_executingRemoved = false;
+	bool disposable = _executing->disposable;
+	bool result = _executing->execute();
+	if (disposable && !_executingRemoved)
+		removeCommand(commandId);
+	hCommand *finished = _executing;
+	bool removed = _executingRemoved;
+	_executing = nullptr;
+	_executingRemoved = false;
+	if (removed)
+		delete finished;
+	return result;
+}
+
+bool hScheduler::executeTasks(int commandId)
+{
+	if (_executing != nullptr || commandId < 0 || commandId >= commandCounter)
+		return false;
+	bool attempted = false;
+	bool succeeded = true;
+	for (int i = commandId; i < commandCounter; ++i)
 	{
-		if (checkSchedule(i))
-		{
-			commands[i]->execute();
-			//remove disposable commands
-			if (commands[i]->disposable)
-			{
-				removeCommand(i);
-			}
-		}
-		i++;
+		if (commands[i] == nullptr || !checkSchedule(i))
+			continue;
+		attempted = true;
+		bool result = executeTask(i);
+		succeeded = result && succeeded;
 	}
+	return attempted && succeeded;
 }
 
 void hScheduler::removeCommand(int cNumber)
 {
-	if (cNumber >= 0 && cNumber < commandCounter)
-	{
-		if (commands[cNumber] != NULL)
-		{
-			delete commands[cNumber];
-			commands[cNumber] = NULL;
-		}
-	}
+	hCommand *command = getTask(cNumber);
+	if (command == nullptr)
+		return;
+	commands[cNumber] = nullptr;
+	if (command == _executing)
+		_executingRemoved = true;
+	else
+		delete command;
 }
 
 void hScheduler::removeCommands(int payload)
 {
-	for (int i = 0; i < commandCounter; i++)
-	{
-		if (commands[i] != NULL)
-		{
-			if (commands[i]->payload == payload)
-				removeCommand(i);
-		}
-	}
+	for (int i = 0; i < commandCounter; ++i)
+		if (commands[i] != nullptr && commands[i]->payload == payload)
+			removeCommand(i);
 }
 
 hCommand *hScheduler::getTask(int taskNumber)
 {
-	if (taskNumber <= commandCounter)
-	{
-		return commands[taskNumber];
-	}
-	return nullptr;
+	return taskNumber >= 0 && taskNumber < commandCounter ? commands[taskNumber] : nullptr;
 }
 
 int hScheduler::maxTaskCount()
@@ -118,21 +133,13 @@ int hScheduler::maxTaskCount()
 int hScheduler::activeTaskCount()
 {
 	int result = 0;
-	for (int i = 0; i < commandCounter; i++)
-	{
-		if (commands[i] != 0)
-			result++;
-	}
-	return 0;
+	for (int i = 0; i < commandCounter; ++i)
+		if (commands[i] != nullptr)
+			++result;
+	return result;
 }
 
-hScheduler::hScheduler()
-{
-	for (int i = 0; i < commandCounter; i++)
-	{
-		commands[i] = NULL;
-	}
-}
+hScheduler::hScheduler() = default;
 
 hScheduler::~hScheduler()
 {
@@ -141,12 +148,10 @@ hScheduler::~hScheduler()
 
 int hScheduler::getFreeSlot()
 {
-	int i = 0;
-	while (i < commandCounter && commands[i])
-	{
-		i++;
-	}
-	return i;
+	for (int i = 0; i < commandCounter; ++i)
+		if (commands[i] == nullptr)
+			return i;
+	return full;
 }
 
 //checking command validation
@@ -205,6 +210,8 @@ bool hScheduler::checkSchedule(int cNumber)
 		}
 		break;
 
+	case weekly:
+		return false; // Weekly scheduling remains unsupported.
 	case monthly:
 		if (commands[cNumber]->scheduleTime.tm_mon == month() && commands[cNumber]->scheduleTime.tm_hour == hour() && commands[cNumber]->scheduleTime.tm_min == minute())
 		{
@@ -227,52 +234,41 @@ bool hScheduler::checkSchedule(int cNumber)
 
 bool hScheduler::findDuplicate(hCommand *command)
 {
-	int i = 0;
-	bool result = false;
-	while (i < commandCounter)
-	{
-		if (commands[i] != NULL)
-		{
-			if (
-				//(commands[i]->disposable == command->disposable) &&
-				(commands[i]->payload == command->payload) &&
-				(commands[i]->scheduleTime.tm_hour == command->scheduleTime.tm_hour) &&
-				(commands[i]->scheduleTime.tm_min == command->scheduleTime.tm_min) &&
-				(commands[i]->scheduleTime.tm_sec == command->scheduleTime.tm_sec) &&
-				(commands[i]->scheduleTime.tm_wday == command->scheduleTime.tm_wday))
-			{
-				result = true;
-				break;
-			}
-		}
-		i++;
-	}
-	return result;
+	for (int i = 0; i < commandCounter; ++i)
+		if (commands[i] != nullptr && commands[i]->isDuplicateOf(*command))
+			return true;
+	return false;
+}
+
+bool hCommand::isDuplicateOf(const hCommand &other) const
+{
+	return commandType() != nullptr && commandType() == other.commandType() &&
+		commandContext() == other.commandContext() &&
+		_callbackFunction == other._callbackFunction && payload == other.payload &&
+		disposable == other.disposable && scheduleType == other.scheduleType &&
+		scheduleTime.tm_hour == other.scheduleTime.tm_hour &&
+		scheduleTime.tm_min == other.scheduleTime.tm_min &&
+		scheduleTime.tm_sec == other.scheduleTime.tm_sec &&
+		scheduleTime.tm_wday == other.scheduleTime.tm_wday &&
+		scheduleTime.tm_mday == other.scheduleTime.tm_mday &&
+		scheduleTime.tm_mon == other.scheduleTime.tm_mon &&
+		scheduleTime.tm_year == other.scheduleTime.tm_year;
 }
 
 hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload)
-{
-	this->disposable = disposable;
-	this->scheduleTime = scheduleTime;
-	this->scheduleType = scheduleType;
-	this->payload = payload;
-}
+	: disposable(disposable), scheduleTime(scheduleTime), scheduleType(scheduleType), payload(payload)
+{}
 
 hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)())
+	: hCommand(disposable, scheduleTime, scheduleType, 0)
 {
-	this->disposable = disposable;
-	this->scheduleTime = scheduleTime;
-	this->scheduleType = scheduleType;
-	this->_callbackFunction = callbackFunction;
+	_callbackFunction = callbackFunction;
 }
 
-hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator * _config)
+hCommand::hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *config)
+	: hCommand(disposable, scheduleTime, scheduleType, payload)
 {
-	this->disposable = disposable;
-	this->scheduleTime = scheduleTime;
-	this->scheduleType = scheduleType;
-	this->payload = payload;
-	this->_config = _config;
+	_config = config;
 }
 
 bool hPumpCommand::execute()
@@ -293,7 +289,6 @@ hPumpsController::hPumpsController(hScheduler *scheduler, hConfigurator *config)
 
 void hPumpsController::createDailyPlan(bool holiday) //daily plan factory
 {
-	tm scht;
 
 	if (holiday)
 	{
@@ -314,7 +309,6 @@ void hPumpsController::removeDailyPlan(int pumpNumber)
 bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
 {
 	bool canTurnOn = true;
-	int taskId = 0;
 	float tempModifier = 0;
 	if (hour() > 10 && hour() < 14)
 	{
@@ -337,13 +331,13 @@ bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 		canTurnOn = false;
 	if (canTurnOn)
 	{
-		tm tTime;
+		tm tTime = {};
 		tTime.tm_hour = hour();
 		tTime.tm_min = minute();
 		tTime.tm_mday = day();
 		tTime.tm_wday = weekday();
-		//taskId=this->_scheduler->addTask(new hPumpCommand(true, tTime, hourly, pumpNumber));
-		taskId = this->_scheduler->addExecuteTask(new hPumpCommand(true, tTime, hourly, pumpNumber));
+		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber)))
+			return false;
 		//update config
 		_config->setPumpStatusOn(pumpNumber, actualTemp, setTemp);
 		sanityCheck();
@@ -351,19 +345,9 @@ bool hPumpsController::turnOnHeatPumpReq(int pumpNumber, float actualTemp, float
 	return canTurnOn;
 }
 
-bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, float setTemp)
+bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float /*actualTemp*/, float /*setTemp*/)
 {
 	bool canTurnOff = true;
-	int taskId = 0;
-	float tempModifier = 0;
-	if (hour() > 10 && hour() < 14)
-	{
-		tempModifier = _MAX_DAY_OVERHEATING;
-	}
-	if (hour() > 22 && hour() < 6)
-	{
-		tempModifier = _MAX_NIGHT_COOLING;
-	}
 	//check turn on off validation for example from config.history
 
 	//negative validations
@@ -399,13 +383,13 @@ bool hPumpsController::turnOffHeatPumpReq(int pumpNumber, float actualTemp, floa
 #endif // !_CPPWIN
 
 		//doing off pump action
-		tm tTime;
+		tm tTime = {};
 		tTime.tm_hour = hour();
 		tTime.tm_min = minute();
 		tTime.tm_mday = day();
 		tTime.tm_wday = weekday();
-		//taskId=this->_scheduler->addTask(new hPumpCommand(true, tTime, hourly, pumpNumber+10));
-		taskId = this->_scheduler->addExecuteTask(new hPumpCommand(true, tTime, hourly, pumpNumber + 10));
+		if (!_scheduler->addExecuteTask(new (std::nothrow) hPumpCommand(true, tTime, hourly, pumpNumber + 10)))
+			return false;
 		_config->setPumpStatusOff(pumpNumber);
 		sanityCheck();
 	}
@@ -422,16 +406,15 @@ void hPumpsController::turnOnDomesticWaterPumpReq(tm tTime)
 {
 
 	//functions will be call from MQTT incoming requests
-	int taskId = 0;
-	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, hourly, _DOMESTIC_WATER_PUMP,_config));
+	_scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, hourly, _DOMESTIC_WATER_PUMP,_config));
 	sanityCheck();
 }
 
 void hPumpsController::turnOffDomesticWaterPumpReq(tm tTime)
 {
+	if (_scheduler->addTask(new (std::nothrow) hDomesticWaterPumpCommand(false, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF, _config)) < 0)
+		return;
 	_config->manualCirculationEnabled = false;
-	int taskId = 0;
-	taskId = _scheduler->addTask(new hDomesticWaterPumpCommand(false, tTime, minutly, _DOMESTIC_WATER_PUMP_OFF, _config));
 	sanityCheck();
 }
 

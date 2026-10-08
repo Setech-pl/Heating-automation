@@ -15,6 +15,12 @@ class hCommand
 {
 public:
 	virtual bool execute() = 0;
+	virtual ~hCommand() = default;
+	bool isDuplicateOf(const hCommand &other) const;
+	// Unknown derived commands are not deduplicated. Each concrete command
+	// opts in with its own typeKey; context identifies any external target.
+	virtual const void *commandType() const { return nullptr; }
+	virtual const void *commandContext() const { return _config; }
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload);
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)());
 	hCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config);
@@ -25,15 +31,20 @@ public:
 	char result[21] = {};
 
 protected:
-	void (*_callbackFunction)();
-	hCommand *pumpsController;
-	hConfigurator *_config;
+	template<class T> static const void *typeKey() {
+		static char key;
+		return &key;
+	}
+	void (*_callbackFunction)() = nullptr;
+	hCommand *pumpsController = nullptr;
+	hConfigurator *_config = nullptr;
 };
 
 class hCallbackCommand : public hCommand
 {
 public:
-	bool execute();
+	const void *commandType() const override { return typeKey<hCallbackCommand>(); }
+	bool execute() override;
 	hCallbackCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, void (*callbackFunction)()) : hCommand(disposable, scheduleTime, scheduleType, callbackFunction){};
 };
 
@@ -41,7 +52,8 @@ public:
 class hDomesticWaterPumpCommand : public hCommand
 {
 public:
-	bool execute();
+	const void *commandType() const override { return typeKey<hDomesticWaterPumpCommand>(); }
+	bool execute() override;
 	hDomesticWaterPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hConfigurator *_config) : hCommand(disposable, scheduleTime, scheduleType, payload, _config) {};
 
 };
@@ -51,12 +63,26 @@ public:
 class hScheduler
 {
 public:
-	int addTask(hCommand *polecenie); //return integer id of added task
-	int addExecuteTask(hCommand *polecenie);
+	enum AddResult { invalidTask = -1, full = -2, duplicate = -3 };
+	// Takes ownership of a fresh heap command on every outcome. Returns a
+	// slot [0, maxTaskCount()) or a negative AddResult. Re-submitting an
+	// already owned pointer rejects it without deleting the existing task.
+	int addTask(hCommand *polecenie);
+	// Consumes as above; runs only this task if due, returning execute()'s result.
+	// Accepted tasks that cannot run yet remain owned. Reentrant execution
+	// returns false; callbacks may still add or remove tasks.
+	bool addExecuteTask(hCommand *polecenie);
+	// Removal/destruction deletes owned tasks through the virtual destructor.
+	// Removing the currently executing task defers deletion until it returns.
 	void removeAllCommands();
-	void executeTasks(int commandId = 0);
+	// Scans due tasks from commandId; true iff at least one was attempted
+	// and all attempted executions succeeded. Disposable tasks are consumed
+	// after one attempt, including a failed attempt. Recurring tasks remain
+	// owned until explicit removal or scheduler destruction.
+	bool executeTasks(int commandId = 0);
 	void removeCommand(int cNumber);
 	void removeCommands(int payload);
+	// Borrowed pointer; invalid after removal, disposable execution or destruction.
 	hCommand *getTask(int taskNumber);
 	int maxTaskCount();
 	int activeTaskCount();
@@ -64,8 +90,15 @@ public:
 	~hScheduler();
 
 private:
-	const unsigned int commandCounter = 512;
-	hCommand *commands[512];
+	hScheduler(const hScheduler &) = delete;
+	hScheduler &operator=(const hScheduler &) = delete;
+	static const int commandCounter = 512;
+	hCommand *commands[commandCounter] = {};
+	// Callbacks may remove their own task: unlink immediately, delete only
+	// after execute() returns. There is no separate pointer execution queue.
+	hCommand *_executing = nullptr;
+	bool _executingRemoved = false;
+	bool executeTask(int commandId);
 	int getFreeSlot();
 	bool checkSchedule(int cNumber);
 	bool findDuplicate(hCommand *polecenie);
@@ -78,7 +111,8 @@ private:
 class hPumpCommand : public hCommand
 {
 public:
-	bool execute();
+	const void *commandType() const override { return typeKey<hPumpCommand>(); }
+	bool execute() override;
 	hPumpCommand(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload) : hCommand(disposable, scheduleTime, scheduleType, payload){};
 };
 

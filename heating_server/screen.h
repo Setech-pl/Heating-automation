@@ -46,7 +46,9 @@ private:
 class hDisableBacklight : public hCommand
 {
 public:
-	bool execute();
+	const void *commandType() const override { return typeKey<hDisableBacklight>(); }
+	const void *commandContext() const override { return _lcd; }
+	bool execute() override;
 	hDisableBacklight(bool disposable, tm scheduleTime, escheduleType scheduleType, int payload, hScreen *display);
 
 private:
