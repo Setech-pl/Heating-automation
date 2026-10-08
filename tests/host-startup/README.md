@@ -9,8 +9,8 @@ python3 scripts/test-host-startup.py --sanitize
 
 Wymagania: Python ≥3.9, Clang (`CXX` może wskazać inny Clang) i przypięty,
 czysty checkout NTPClient 3.2.0 w `.arduino/user/libraries/NTPClient`.
-Skrypt nie pobiera zależności. Pliki produkcyjne `utils`, `screen`, `scheduler`
-i `heating_config` są każdorazowo kopiowane do ignorowanego
+Skrypt nie pobiera zależności. Pliki produkcyjne `utils`, `screen`, `scheduler`,
+`heating_config`, `relay_output` i `createDailyPlan` są kopiowane do ignorowanego
 `build/host-startup/{normal,sanitize}/source`, tak jak przy buildzie firmware,
 aby `secrets.h` wskazywało wyłącznie przykład. Nie ma osobnej implementacji
 logiki w testach ani odczytu lokalnych sekretów.
@@ -36,3 +36,5 @@ odczytów niezainicjalizowanych danych; wzorce pamięci i obserwacja renderu są
 osobną regresją. To test modułów używanych przez szkic, nie pełnego `setup()`
 ani routera/schedulera. Istniejące ostrzeżenia pozostałych modułów są widoczne.
 Build firmware i regresje UDP należy uruchamiać oddzielnie.
+Pełne `setup()`/`loop()`, kalendarz, limity, GPIO i rzeczywisty timeout MQTT
+obejmuje `scripts/test-host-runtime.py`, także z opcją `--sanitize`.

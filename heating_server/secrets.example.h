@@ -1,7 +1,7 @@
 #pragma once
 
 // Dummy configuration for compilation only. Never upload this B0 build.
-// A real secrets.h stays local and ignored; B0 never reads or copies it.
+// A real secrets.h stays local and ignored; default builds use this example.
 #undef _EXTERNAL_WIFI_SID
 #undef _EXTERNAL_WIFI_PASS
 #undef _INTERNAL_WIFI_SID
